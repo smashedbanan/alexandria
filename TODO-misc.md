@@ -41,8 +41,12 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
   `cp -a` the data dir to `/tmp`, run it there with `ALEXANDRIA_DATA_DIR` pointed at the copy and
   `ALEXANDRIA_EMBEDDING_MODEL=sentence-transformers/multi-qa-MiniLM-L6-cos-v1`, then migrate the copy
   back to MiniLM. Throw the copy away.
-- [ ] **`migrate.rs` batch size is a hardcoded 32** (2026-09-08, added with fact batching). Fine for
-  MiniLM on CPU; make it a config knob only if a larger model or GPU makes a different size matter.
+- [x] **`migrate.rs` batch size is a hardcoded 32.** Done 2026-09-08: `embedding.batch_size` in
+  `config.toml` (default 32, must be >= 1), passed to `reembed()`; `ALEXANDRIA_EMBEDDING_BATCH_SIZE` overrides it.
+- [-] **`embedding.batch_size = 0` is rejected by `reembed()`, not at config load.** 2026-09-08: the
+  server boots fine with 0 because nothing there reads the field; only `migrate-embeddings` errors.
+  Same shape as `server.port` (parse errors caught at load, range errors at use). Move the check
+  into `Config::load_from` if a second consumer of the field ever appears.
 - [-] **`migrate-embeddings` no longer logs "Alexandria v0.2 starting..."** (2026-09-08, side effect of
   ed923ee): the subcommand returns from inside the argument match, before the startup log line. It
   still logs its own progress. Accepted; add a line at the top of `migrate_embeddings()` if it matters.
