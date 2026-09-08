@@ -49,10 +49,20 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
 - [-] **`migrate-embeddings` no longer logs "Alexandria v0.2 starting..."** (2026-09-08, side effect of
   ed923ee): the subcommand returns from inside the argument match, before the startup log line. It
   still logs its own progress. Accepted; add a line at the top of `migrate_embeddings()` if it matters.
-- [ ] **Spec defect: threshold-derivation rule has no valid solution when `nonhit_p99 > hit_min`.**
-  The design spec's `retrieve.min_similarity` rule (and its midpoint fallback) lands above `hit_min`
-  on this corpus (0.373 vs 0.338), so any derived floor cuts a true hit. Rewrite the rule before the
-  next model bench (see `docs/plans/2026-09-08-embedding-model-swap-measurements.md`).
+- [x] **Spec defect: threshold-derivation rule has no valid solution when `nonhit_p99 > hit_min`.**
+  Done 2026-09-08: the rule tried to make the server floor a discriminator, but it is a noise
+  cutoff (client thresholds filter). Rewritten in the design and implementation plans to
+  `nonhit_p50` rounded to two decimals, with a sanity check that it sits below `hit_min` (else the
+  model has no usable floor and the bench reports that). Gives 0.08 on MiniLM next to the 0.10
+  default, 0.55 on bge, 0.54 on nomic; flags msmarco. Measurements doc updated; config unchanged.
+- [-] **The rewritten floor rule has only been applied on paper** (2026-09-08). `nonhit_p50` and the
+  `< hit_min` check were read off the existing measurements tables; no script computes them, since the
+  bench tooling is not in the tree (see the parked entry under Retrieval quality). The next bench
+  should derive the value from its own output and confirm the table above.
+- [-] **`config.rs` and `docs/configuration.md` describe `min_similarity` as 0.10 with no pointer to the
+  derivation rule** (2026-09-08). The rule gives 0.08 for MiniLM; 0.10 was kept as-is because the
+  incumbent won and the difference is immaterial. If a model swap ever lands, the doc comment and the
+  configuration table should cite the rule in the design plan rather than restating measured ranges.
 - [-] **`alexandria-pipeline` unit tests now need the real model** (2026-09-08, d4bc3eb). The CLS-vs-mean
   test sits in `candle.rs` under `#[cfg(test)]` because it flips the private pooling flag, so
   `cargo test -p alexandria-pipeline --lib` downloads MiniLM on a cold cache where before only the
