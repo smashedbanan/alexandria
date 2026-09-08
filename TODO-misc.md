@@ -53,11 +53,13 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
   `cargo test -p alexandria-pipeline --lib` downloads MiniLM on a cold cache where before only the
   `tests/` integration tests did. Accepted; if it bothers anyone, expose a test-only constructor and
   move the test to `tests/embedding_test.rs` with the other slow ones.
-- [ ] **Server boot stamps the lock over an unlocked corpus.** Companion to the guard above (2026-09-08):
-  `migrate-embeddings` refuses, but a normal start with facts present and no lock still writes the
-  configured model as the lock without checking that the stored vectors came from it. Same
-  pre-v003 population, so almost certainly nonexistent in the wild; add the same facts-without-lock
-  check to the boot path if it ever matters.
+- [x] **Server boot stamps the lock over an unlocked corpus.** Done 2026-09-08: `check_embedding_model`
+  now counts facts before stamping and warns (facts present, no lock, model assumed) instead of
+  stamping silently. It still stamps, because the `migrate-embeddings` guard tells the user to "start
+  the server once" to recover a pre-lock database; refusing here would close that path.
+- [-] **Boot could refuse an unlocked corpus instead of warning.** Parked 2026-09-08: needs an escape
+  hatch (e.g. `migrate-embeddings --assume-model`) so a pre-lock database can still be stamped, and the
+  population is almost certainly nonexistent. Add both together if one ever turns up.
 
 ## Build / toolchain
 
