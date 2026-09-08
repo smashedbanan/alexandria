@@ -36,11 +36,12 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
 
 ### Embedding migration follow-ups (deferred from the 2026-09-08 branch review)
 
-- [ ] **`migrate-embeddings` has never run against a real SurrealKV database.** Only the fake-provider
-  test on `kv-mem` and an empty scratch dir exercised it. Before first real use: stop the service,
-  `cp -a` the data dir to `/tmp`, run it there with `ALEXANDRIA_DATA_DIR` pointed at the copy and
-  `ALEXANDRIA_EMBEDDING_MODEL=sentence-transformers/multi-qa-MiniLM-L6-cos-v1`, then migrate the copy
-  back to MiniLM. Throw the copy away.
+- [x] **`migrate-embeddings` has never run against a real SurrealKV database.** Done 2026-09-08 on a
+  `cp -a` copy of the live data dir (485 facts incl. deleted, 317 clusters) with the release binary:
+  MiniLM -> multi-qa-MiniLM (58 s) -> MiniLM (25 s), rerun reports "already on", boot with the wrong
+  model refuses, boot with the right one serves. SurrealKV's `LOCK` makes it refuse a data dir a
+  running server holds ("already locked by another process"), and the server empties `LOCK` on
+  SIGTERM, so "stop the service first" is enforced, not just advised.
 - [x] **`migrate.rs` batch size is a hardcoded 32.** Done 2026-09-08: `embedding.batch_size` in
   `config.toml` (default 32, must be >= 1), passed to `reembed()`; `ALEXANDRIA_EMBEDDING_BATCH_SIZE` overrides it.
 - [-] **`embedding.batch_size = 0` is rejected by `reembed()`, not at config load.** 2026-09-08: the
@@ -72,11 +73,14 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
 - [ ] **Windows `rustflags` (msvc/gnu/gnullvm targets) added 2026-09-08 but unverified.** `.cargo/config.toml`
   sets `target-cpu=x86-64-v2` for the three Windows targets alongside the Linux `mold` target; there's
   no Windows toolchain in this environment to cross-compile and confirm they take effect.
-- [ ] **`[profile.release]` (lto = "thin", codegen-units = 1, strip) added 2026-09-08, never built.**
-  Only `cargo build --workspace` (dev profile) has been run since the toolchain/profile changes,
-  and the 2026-09-08 dependency major bumps (and the same-day `hf-hub` removal in favour of
-  `hub.rs`) were likewise only dev-built and tested; do a `cargo build --release` smoke test before
-  shipping a release artifact.
+- [x] **`[profile.release]` (lto = "thin", codegen-units = 1, strip) added 2026-09-08, never built.**
+  Done 2026-09-08: the profile had in fact been release-built at 17:06 (that binary is the one in
+  `~/.cargo/bin` and running as the service), but that predates the 18:23 `hf-hub` drop. `cargo build
+  --release` on e0356fc: clean, 5m10s, 53 MB stripped binary, boots and loads the model from the
+  local cache.
+- [ ] **Installed service binary is behind the tree.** `~/.cargo/bin/alexandria` (17:06, sha 61f12bc…)
+  predates e0356fc (`hf-hub` -> `hub.rs`); the service has never run the reqwest downloader path. When
+  convenient: `cargo install --path crates/alexandria` and `systemctl --user restart alexandria`.
 
 - [ ] **Startup memory doubled during model load (2026-09-08).** `candle.rs` now reads the safetensors
   file into a `Vec<u8>` (`from_buffered_safetensors`) instead of mmap, so the workspace can carry
