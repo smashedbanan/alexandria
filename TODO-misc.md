@@ -86,6 +86,13 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
   boot, then the buffer drops. Revisit only if a much larger model is adopted; the escape hatch is a
   `#[allow(unsafe_code)]` on that one call plus `from_mmaped_safetensors`.
 
+- [ ] **jj user-level email is the private address.** `~/.config/jj/config.toml` sets `user.email =
+  newtlord-github@pm.me`, so `jj git push` to GitHub fails with "push declined due to email privacy
+  restrictions" (GH007) on any commit jj authored. 2026-09-08: this repo got a repo-level override to the
+  noreply address (`jj config set --repo user.email ...`) and the eight unpushed commits were rewritten
+  with `jj metaedit --update-author`. Every other jj repo pushed to GitHub will hit the same error until
+  the user-level value changes: `jj config set --user user.email '160296478+smashedbanan@users.noreply.github.com'`.
+
 ## Dependencies
 
 - [x] **`hf-hub` 1.0 is heavy for what we use.** Done 2026-09-08: replaced by
