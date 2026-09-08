@@ -22,6 +22,12 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
 
 ## Server
 
+- [-] **Implicitly created sessions have no `agent_id` or `model`.** `SessionRepo::find_or_create`
+  (2026-09-08, replaced the duplicated block in `do_store_memory` / `do_import_document`) creates with
+  both `None`, and `finalize_session` only sets summary and tags, so a session first seen via
+  `store_memory` can never acquire them. Same as before the refactor; nothing reads the fields yet.
+  Add optional `agent_id`/`model` params to `store_memory` and thread them through if a session view
+  ever wants them.
 - [-] **`raw` record carries no session.** The 2026-09-08 `import_document` session linkage attaches
   the chunks only; the `raw` document record is reachable from them via `extracted_from` but has no
   session edge of its own. Parked 2026-09-08: `contains_session_memory` is declared `IN session OUT fact`,
