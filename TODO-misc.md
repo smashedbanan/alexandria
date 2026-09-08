@@ -4,14 +4,6 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
 
 ## Retrieval quality
 
-- [x] **Embedding model is the real ceiling.** Done 2026-09-08: `all-MiniLM-L6-v2` stays. Two benches on
-  the live corpus (143 facts, 12 questions; `docs/plans/2026-09-08-embedding-model-swap-measurements.md`):
-  msmarco-MiniLM, multi-qa-MiniLM, bge-small (with and without its query prefix), and nomic-embed-text-v1.5
-  (768 and 384 dims, with `search_query:`/`search_document:` prefixes) all lose to MiniLM on mean rank
-  (1.42 vs 2.33 best challenger) and separation (gap +0.148 vs +0.091). The larger models compress the
-  cosine range so the noise floor rises with the hits, and they miss the paraphrase-heavy questions
-  MiniLM's keyword overlap carries. Closed; `alexandria migrate-embeddings` exists if a candidate ever
-  needs trying.
 - [-] **Model bench tooling is not in the tree** (2026-09-08). The candle bench example was deleted with
   the first pass and the second pass ran through a throwaway sentence-transformers script in
   `/tmp/alexandria-bench` (`uv run` with inline metadata pinning torch to the pytorch CPU index; corpus
@@ -34,14 +26,6 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
 
 ### Embedding migration follow-ups (deferred from the 2026-09-08 branch review)
 
-- [x] **`migrate-embeddings` has never run against a real SurrealKV database.** Done 2026-09-08 on a
-  `cp -a` copy of the live data dir (485 facts incl. deleted, 317 clusters) with the release binary:
-  MiniLM -> multi-qa-MiniLM (58 s) -> MiniLM (25 s), rerun reports "already on", boot with the wrong
-  model refuses, boot with the right one serves. SurrealKV's `LOCK` makes it refuse a data dir a
-  running server holds ("already locked by another process"), and the server empties `LOCK` on
-  SIGTERM, so "stop the service first" is enforced, not just advised.
-- [x] **`migrate.rs` batch size is a hardcoded 32.** Done 2026-09-08: `embedding.batch_size` in
-  `config.toml` (default 32, must be >= 1), passed to `reembed()`; `ALEXANDRIA_EMBEDDING_BATCH_SIZE` overrides it.
 - [-] **`embedding.batch_size = 0` is rejected by `reembed()`, not at config load.** 2026-09-08: the
   server boots fine with 0 because nothing there reads the field; only `migrate-embeddings` errors.
   Same shape as `server.port` (parse errors caught at load, range errors at use). Move the check
@@ -49,12 +33,6 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
 - [-] **`migrate-embeddings` no longer logs "Alexandria v0.2 starting..."** (2026-09-08, side effect of
   ed923ee): the subcommand returns from inside the argument match, before the startup log line. It
   still logs its own progress. Accepted; add a line at the top of `migrate_embeddings()` if it matters.
-- [x] **Spec defect: threshold-derivation rule has no valid solution when `nonhit_p99 > hit_min`.**
-  Done 2026-09-08: the rule tried to make the server floor a discriminator, but it is a noise
-  cutoff (client thresholds filter). Rewritten in the design and implementation plans to
-  `nonhit_p50` rounded to two decimals, with a sanity check that it sits below `hit_min` (else the
-  model has no usable floor and the bench reports that). Gives 0.08 on MiniLM next to the 0.10
-  default, 0.55 on bge, 0.54 on nomic; flags msmarco. Measurements doc updated; config unchanged.
 - [-] **The rewritten floor rule has only been applied on paper** (2026-09-08). `nonhit_p50` and the
   `< hit_min` check were read off the existing measurements tables; no script computes them, since the
   bench tooling is not in the tree (see the parked entry under Retrieval quality). The next bench
@@ -68,10 +46,6 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
   `cargo test -p alexandria-pipeline --lib` downloads MiniLM on a cold cache where before only the
   `tests/` integration tests did. Accepted; if it bothers anyone, expose a test-only constructor and
   move the test to `tests/embedding_test.rs` with the other slow ones.
-- [x] **Server boot stamps the lock over an unlocked corpus.** Done 2026-09-08: `check_embedding_model`
-  now counts facts before stamping and warns (facts present, no lock, model assumed) instead of
-  stamping silently. It still stamps, because the `migrate-embeddings` guard tells the user to "start
-  the server once" to recover a pre-lock database; refusing here would close that path.
 - [-] **Boot could refuse an unlocked corpus instead of warning.** Parked 2026-09-08: needs an escape
   hatch (e.g. `migrate-embeddings --assume-model`) so a pre-lock database can still be stamped, and the
   population is almost certainly nonexistent. Add both together if one ever turns up.
@@ -81,14 +55,16 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
 - [ ] **Windows `rustflags` (msvc/gnu/gnullvm targets) added 2026-09-08 but unverified.** `.cargo/config.toml`
   sets `target-cpu=x86-64-v2` for the three Windows targets alongside the Linux `mold` target; there's
   no Windows toolchain in this environment to cross-compile and confirm they take effect.
-- [x] **`[profile.release]` (lto = "thin", codegen-units = 1, strip) added 2026-09-08, never built.**
-  Done 2026-09-08: the profile had in fact been release-built at 17:06 (that binary is the one in
-  `~/.cargo/bin` and running as the service), but that predates the 18:23 `hf-hub` drop. `cargo build
-  --release` on e0356fc: clean, 5m10s, 53 MB stripped binary, boots and loads the model from the
-  local cache.
-- [ ] **Installed service binary is behind the tree.** `~/.cargo/bin/alexandria` (17:06, sha 61f12bc…)
+- [ ] Done 2026-09-08: **Installed service binary is behind the tree.** `~/.cargo/bin/alexandria` (17:06, sha 61f12bc…)
   predates e0356fc (`hf-hub` -> `hub.rs`); the service has never run the reqwest downloader path. When
   convenient: `cargo install --path crates/alexandria` and `systemctl --user restart alexandria`.
+  Reinstalled at f996e35 (sha 1db33669…) and restarted; boot log shows the model served from the warm
+  cache in ~0.3 s.
+- [-] **The `hub.rs` download itself is still unexercised by the service** (2026-09-08). The reinstall
+  above only proved the cache-first branch, since `~/.cache/huggingface/hub/models--sentence-transformers--all-MiniLM-L6-v2`
+  was already populated. The download branch has only run under `cargo test`. To exercise it for real:
+  move that directory aside, restart the service, confirm the fetch in the journal, then delete the
+  moved copy. Parked; do it the next time the cache is wiped anyway.
 
 - [ ] **Startup memory doubled during model load (2026-09-08).** `candle.rs` now reads the safetensors
   file into a `Vec<u8>` (`from_buffered_safetensors`) instead of mmap, so the workspace can carry
@@ -105,10 +81,6 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
 
 ## Dependencies
 
-- [x] **`hf-hub` 1.0 is heavy for what we use.** Done 2026-09-08: replaced by
-  `alexandria-pipeline/src/embedding/hub.rs` (~90 lines on `reqwest`, already in the tree via
-  rmcp/surrealdb). Reads and writes the standard `models--owner--name/{refs/main,snapshots/<sha>/}`
-  layout, so existing caches are reused with no network. Unique crates 658 -> 581.
 - [-] **Cache-first model loading never refreshes a cached revision** (2026-09-08). Once `refs/main`
   is on disk it is served forever; delete `~/.cache/huggingface/hub/models--<owner>--<name>` to
   re-fetch. Accepted as-is.
