@@ -41,35 +41,13 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
   back to MiniLM. Throw the copy away.
 - [ ] **`migrate.rs` batch size is a hardcoded 32** (2026-09-08, added with fact batching). Fine for
   MiniLM on CPU; make it a config knob only if a larger model or GPU makes a different size matter.
-- [x] **`ClusterRepo::list_with_counts` swallows `get_members` errors** (`unwrap_or(0)`), so a failing
-  membership query reads as an empty cluster. Done 2026-09-08 (bfaa52a): the error now propagates; the
-  debug clusters page already rendered it.
-- [x] **Empty clusters keep a stale-dimension centroid** after a dimension-changing migration.
-  Done 2026-09-08 (5326677): `migrate-embeddings` deletes empty clusters instead of skipping them.
-  `engine::search::cosine_similarity` still only `debug_assert`s equal lengths; no other path leaves
-  a stale centroid behind (split/merge delete their originals).
-- [x] **"Fresh database" is inferred purely from a missing lock.** Done 2026-09-08 (df7db27):
-  `migrate-embeddings` now errors when facts exist without a lock and tells the user to boot once with
-  config naming the model that produced them. The server boot path itself still stamps whatever the
-  config names over an unlocked corpus; see the open item below.
-- [x] **`--help` output is preceded by a tracing INFO line.** Done 2026-09-08 (ed923ee). `tracing_subscriber::fmt::init()` and the
-  "Alexandria v0.2 starting..." log run before argument parsing (2026-09-08), so `alexandria --help`
-  prints a log line to stderr before the usage. Cosmetic; move the subscriber init below the arg
-  match if it bothers anyone.
 - [-] **`migrate-embeddings` no longer logs "Alexandria v0.2 starting..."** (2026-09-08, side effect of
   ed923ee): the subcommand returns from inside the argument match, before the startup log line. It
   still logs its own progress. Accepted; add a line at the top of `migrate_embeddings()` if it matters.
-- [x] **Pooling-config warn text** (done 2026-09-08, 843f325) in `candle.rs` says "no 1_Pooling/config.json" even when the cause
-  was a network failure; the real cause is only in the interpolated `{e}`.
 - [ ] **Spec defect: threshold-derivation rule has no valid solution when `nonhit_p99 > hit_min`.**
   The design spec's `retrieve.min_similarity` rule (and its midpoint fallback) lands above `hit_min`
   on this corpus (0.373 vs 0.338), so any derived floor cuts a true hit. Rewrite the rule before the
   next model bench (see `docs/plans/2026-09-08-embedding-model-swap-measurements.md`).
-- [x] **`CLAUDE.md` says `record_id_to_string()` lives in `alexandria-mcp/src/server.rs`.** Fixed 2026-09-08 (4f2d961). It lives
-  in `alexandria-storage/src/lib.rs` and `server.rs` only re-exports it. Fix the note.
-- [x] **Test gaps, low priority.** Done 2026-09-08 (d4bc3eb): CLS-vs-mean unit test in `candle.rs`
-  (loads the real MiniLM, slow like the other provider tests), per-text fake vectors in the `reembed`
-  centroid test, a `Done { 0, 0 }` test, and an order-independent `all_ids_and_content` assertion.
 - [-] **`alexandria-pipeline` unit tests now need the real model** (2026-09-08, d4bc3eb). The CLS-vs-mean
   test sits in `candle.rs` under `#[cfg(test)]` because it flips the private pooling flag, so
   `cargo test -p alexandria-pipeline --lib` downloads MiniLM on a cold cache where before only the
@@ -96,20 +74,9 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
   `unsafe_code = "forbid"`. For MiniLM (~90 MB) the buffer plus the built tensors coexist briefly at
   boot, then the buffer drops. Revisit only if a much larger model is adopted; the escape hatch is a
   `#[allow(unsafe_code)]` on that one call plus `from_mmaped_safetensors`.
-- [x] **`ALEXANDRIA_EMBEDDING_DEVICE` env override has no test.** Done 2026-09-08 (fc582e0). Noticed 2026-09-08 while moving the
-  config tests off process env; the other five overrides are covered by `test_env_overrides` /
-  `test_server_env_overrides`, this one is not. One-line addition to `test_env_overrides`.
 
 ## Dependencies
 
-- [x] **Direct-dep major bumps done 2026-09-08**, one commit each: `dirs` 7, `base64` 0.23, `toml` 1.1,
-  `tokenizers` 0.23, `hf-hub` 1.0. `serial_test` was already gone from the workspace. Only `hf-hub`
-  needed code: 1.0 is a rewrite (reqwest client, `blocking` feature runs its own runtime thread) and
-  by default revalidates every cached file against the Hub on each boot, retrying on transient
-  errors — a cached offline start went from 0.5 s to 12 s. `candle.rs` now resolves
-  `local_files_only` first and only downloads on a miss, restoring 0.5 behaviour (~0.4 s cached start
-  with the Hub blackholed). Net tree: openssl/native-tls/ureq gone, `hf-xet` (mandatory in 1.0) in;
-  629 → 662 crates.
 - [ ] **`hf-hub` 1.0 is heavy for what we use.** We call one thing (download four files into the
   standard HF cache) and pay for the whole client plus mandatory `hf-xet` (redb, sysinfo, statrs,
   xet-*): +33 crates net. `reqwest` 0.13 is already in the tree via rmcp/surrealdb, so a ~40-line
