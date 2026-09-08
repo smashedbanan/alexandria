@@ -22,10 +22,6 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
 
 ## Server
 
-- [ ] **Session find-or-create is duplicated.** `do_store_memory` and `do_import_document` (2026-09-08)
-  each carry the same find-by-external-id, create-if-missing, re-find, unwrap-record-id block. Two
-  copies is tolerable; on a third caller move it into `SessionRepo::find_or_create` returning the
-  record id string.
 - [-] **`raw` record carries no session.** The 2026-09-08 `import_document` session linkage attaches
   the chunks only; the `raw` document record is reachable from them via `extracted_from` but has no
   session edge of its own. Parked 2026-09-08: `contains_session_memory` is declared `IN session OUT fact`,
