@@ -4,21 +4,19 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
 
 ## Retrieval quality
 
-- [ ] **Embedding model is the real ceiling.** `all-MiniLM-L6-v2` is a symmetric similarity
-  model. A natural-language question against a stored statement scores only ~0.1–0.2
-  cosine ("which database does the project use" vs "the project uses SurrealDB" = 0.19),
-  while a keyword hit scores ~0.6. The floor was lowered to 0.10 to compensate, but an
-  asymmetric retrieval model (e.g. an msmarco/bge/e5 family model) would separate real
-  matches from noise far better. Blocked on: model is locked on first boot, so switching
-  the default needs a migration/re-embed story.
-  Measured 2026-09-08 on the live corpus (143 facts, 12 questions; see
-  `docs/plans/2026-09-08-embedding-model-swap-measurements.md`): none of msmarco-MiniLM-L6-cos-v5,
-  multi-qa-MiniLM-L6-cos-v1, or bge-small-en-v1.5 beat MiniLM (mean rank 1.42 vs 2.33 for the best
-  challenger, mean gap +0.148 vs +0.091). Default unchanged. bge-small scores higher in absolute
-  terms (hit_min 0.620 vs 0.338) but its noise floor rises just as much (nonhit_p50 0.564 vs 0.077),
-  so separation is worse. The blocker is gone: `alexandria migrate-embeddings` re-embeds an existing
-  database and CLS-pooled models load, so a future candidate is a config change plus one command.
-  Note bge was measured without its query instruction prefix.
+- [x] **Embedding model is the real ceiling.** Done 2026-09-08: `all-MiniLM-L6-v2` stays. Two benches on
+  the live corpus (143 facts, 12 questions; `docs/plans/2026-09-08-embedding-model-swap-measurements.md`):
+  msmarco-MiniLM, multi-qa-MiniLM, bge-small (with and without its query prefix), and nomic-embed-text-v1.5
+  (768 and 384 dims, with `search_query:`/`search_document:` prefixes) all lose to MiniLM on mean rank
+  (1.42 vs 2.33 best challenger) and separation (gap +0.148 vs +0.091). The larger models compress the
+  cosine range so the noise floor rises with the hits, and they miss the paraphrase-heavy questions
+  MiniLM's keyword overlap carries. Closed; `alexandria migrate-embeddings` exists if a candidate ever
+  needs trying.
+- [-] **Model bench tooling is not in the tree** (2026-09-08). The candle bench example was deleted with
+  the first pass and the second pass ran through a throwaway sentence-transformers script in
+  `/tmp/alexandria-bench` (`uv run` with inline metadata pinning torch to the pytorch CPU index; corpus
+  dumped to JSON by a one-off `MemoryRepo::list` example). Recipe is recorded in the measurements doc.
+  Parked: the model question is closed, so nothing to keep.
 
 ## Server
 
