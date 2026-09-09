@@ -33,12 +33,6 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
 
 ## Build / toolchain
 
-- [-] **The `hub.rs` download itself is still unexercised by the service** (2026-09-08). The service reinstall
-  (f996e35) only proved the cache-first branch, since `~/.cache/huggingface/hub/models--sentence-transformers--all-MiniLM-L6-v2`
-  was already populated. The download branch has only run under `cargo test`. To exercise it for real:
-  move that directory aside, restart the service, confirm the fetch in the journal, then delete the
-  moved copy. Parked; do it the next time the cache is wiped anyway.
-
 - [-] **Startup memory doubled during model load (2026-09-08).** `candle.rs` reads the safetensors
   file into a `Vec<u8>` (`from_buffered_safetensors`) instead of mmap, so the workspace can carry
   `unsafe_code = "forbid"`. For MiniLM (~90 MB) the buffer and the built tensors coexist until
@@ -112,7 +106,9 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
   `tail` argument away but would grow the block without bound on long sessions). If duplicates of that
   shape keep appearing, the next step is one `retrieve_memories` per candidate with the top hits fed to
   a second, smaller haiku call.
-- [ ] **A queued follow-up prompt lands in the previous turn's chunk.** If the user types the next
-  prompt while a turn is still generating, Claude Code dispatches it as soon as the turn ends, inside
-  the 1 s flush wait, so the extract hook sees it with the previous turn. Harmless (it is extracted
-  once, just one turn early); noted so it is not mistaken for a marker bug.
+- [-] **The extract chunk now ends at the last assistant line** (2026-09-09, closes the "queued
+  follow-up prompt lands in the previous turn's chunk" item). A prompt dispatched inside the 1 s flush
+  wait sits past that line and is extracted with its own turn. Still one turn early if the next turn's
+  first assistant message also lands inside the wait; that needs a first-token latency under 1 s, not
+  seen yet. If it shows up, cut at the last assistant line that precedes a `queue-operation` `dequeue`
+  line instead (Claude Code writes one when it dispatches a queued prompt).
