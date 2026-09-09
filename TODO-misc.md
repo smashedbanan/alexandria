@@ -82,6 +82,17 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
   sentence-transformers repo ships the file, so this never fires today); two servers first-booting
   on the same empty cache both download (rename-into-place keeps the result correct); gated or
   private models cannot be fetched. Add whichever one actually bites.
+- [-] **Every dependency is `default-features = false` with features listed explicitly** (2026-09-08).
+  surrealdb carries only `kv-mem` and `kv-surrealkv`; `protocol-ws` and `rustls` must be re-added
+  (comment in the root `Cargo.toml`) if SurrealDB is ever not on localhost. Runtime-only defaults
+  dropped on purpose: tokio `full` (six named features instead), tracing-subscriber `smallvec`, axum
+  `tracing`/`tower-log`, tokenizers `progressbar`/`esaxx_fast`, base64 `simd-unsafe`, chrono
+  `oldtime`/`wasmbind`, toml `display`. Kept on purpose: tracing-subscriber `ansi` and `tracing-log`,
+  since dropping either changes log output without failing any test.
+- [-] **`tokenizers` still builds `onig`** (2026-09-08). candle-core 0.11 depends on tokenizers with
+  the `onig` feature itself, so our `default-features = false` cannot drop the C build. Goes away
+  only if a candle bump drops it; `fancy-regex` is the pure-Rust alternative if it ever becomes ours
+  to choose.
 - [-] **`tokenizers` is held at 0.22 to match candle-core 0.11** (2026-09-08; was 0.23, which built a
   second copy). Bump the workspace pin together with the next candle bump that moves its own.
 - [ ] **Transitive "Unchanged" `cargo update` entries are upstream pins, not ours.** `generic-array`
