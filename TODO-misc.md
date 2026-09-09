@@ -12,14 +12,13 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
 
 ## Server
 
-- [-] **No caller passes `agent_id` / `model` to `store_memory` yet** (2026-09-08, follow-up to the
-  optional params added that day). `SessionRepo::find_or_create` now takes both, sets them on create,
-  and fills still-empty fields on an existing session without overwriting a set value; `store_memory`
-  and `import_document` expose them. The Claude Code hooks (`alexandria-recall.sh` detector stores,
-  `alexandria-extract.sh`, the `alexandria-session.sh` injection) and the Pi extension still send only
-  `session_id`, so every session row still shows both as null. `alexandria-session.sh` is the one
-  place that could stamp `agent_id: "claude-code"` for every interactive store in one line; `model`
-  is not in the hook payload. Add when a session view wants to tell agents apart.
+- [x] Done 2026-09-08: **Claude Code hooks stamp `agent_id: "claude-code"`.** `alexandria-session.sh` now
+  fills `agent_id` as well as `session_id` on `store_memory` / `import_document` calls that lack either
+  (a value the model set is kept); the detector stores in `alexandria-recall.sh` and the extraction stores
+  in `alexandria-extract.sh` send it directly. `SessionRepo::find_or_create` fills a still-empty field on
+  an existing session, so every Claude Code session row gets stamped by its first store from any of the
+  three. Still parked: `model` (not in the hook payload) and the Pi extension, which sends only
+  `session_id`; add when a session view wants to tell those apart.
 - [-] **`raw` record carries no session.** The 2026-09-08 `import_document` session linkage attaches
   the chunks only; the `raw` document record is reachable from them via `extracted_from` but has no
   session edge of its own. Parked 2026-09-08: `contains_session_memory` is declared `IN session OUT fact`,
@@ -28,10 +27,11 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
 
 ### Embedding migration follow-ups (deferred from the 2026-09-08 branch review)
 
-- [-] **`embedding.batch_size = 0` is rejected by `reembed()`, not at config load.** 2026-09-08: the
-  server boots fine with 0 because nothing there reads the field; only `migrate-embeddings` errors.
-  Same shape as `server.port` (parse errors caught at load, range errors at use). Move the check
-  into `Config::load_from` if a second consumer of the field ever appears.
+- [x] Done 2026-09-08: **`embedding.batch_size = 0` is rejected at config load.** The `ensure!` moved
+  from `reembed()` into `Config::load_from`, after the env overrides, so a bad TOML value or
+  `ALEXANDRIA_EMBEDDING_BATCH_SIZE=0` refuses to boot instead of failing only under `migrate-embeddings`.
+  `reembed()` no longer guards the value itself (`chunks(0)` would panic), so any future caller other
+  than `main` has to pass a loaded config value; the `reembed_rejects_zero_batch_size` test went with it.
 - [-] **`migrate-embeddings` no longer logs "Alexandria v0.2 starting..."** (2026-09-08, side effect of
   ed923ee): the subcommand returns from inside the argument match, before the startup log line. It
   still logs its own progress. Accepted; add a line at the top of `migrate_embeddings()` if it matters.
@@ -69,6 +69,11 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
   `safetensors` reader into a `HashMap` holds the same peak. Revisit only if a much larger model is
   adopted; the escape hatch is a `#[allow(unsafe_code)]` on that one call plus
   `from_mmaped_safetensors`.
+
+- [ ] **The installed service predates the `batch_size` boot check** (2026-09-08). The check moved into
+  `Config::load_from` in the tree, but the running service binary was built before it, so a zero in
+  `config.toml` still boots there until the next rebuild and restart. The hooks are symlinked and
+  already live.
 
 ## Dependencies
 
@@ -111,12 +116,11 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
   tag. Add the filter if junk memories of that shape ever appear; add attribution if haiku's output
   turns out to need it. Error text counts toward `ALEXANDRIA_EXTRACT_MIN_CHARS`, so error-heavy
   sessions extract a turn earlier.
-- [-] **`alexandria-recall.sh` and `alexandria-session.sh` still exit on their guards before reading
-  stdin** (2026-09-08). `alexandria-extract.sh` was changed to read first because `test.sh` runs it as
-  a bare `jq | hook` pipeline under `set -eo pipefail`, and a guard exit before the read let jq take
-  SIGPIPE (flaky exit 141, both trees). The other two are only ever piped inside `$(...)` in the test,
-  where the writer's status is ignored, and Claude Code as the caller does not care either. Move the
-  read up if either hook ever gets a bare-pipeline test.
+- [x] Done 2026-09-08: **All three hooks read stdin before any guard.** `alexandria-recall.sh` and
+  `alexandria-session.sh` now match `alexandria-extract.sh`; the recall hook skips the read in debug CLI
+  mode (`$# -gt 0`) so a one-shot tool call from a terminal does not block. The `hook()` helper in
+  `test.sh` was already a bare `jq | hook` pipeline under `set -eo pipefail`, so the SIGPIPE hazard the
+  parked entry described was live there too.
 - [-] **Stop-hook extraction makes one haiku call per turn** (2026-09-08, retry dropped). The retry on an
   empty first result rested on one observation (empty, then three memories on the same prompt) and
   doubled the cost of every tactical turn; the extract log showed only the second call failing, on
@@ -151,10 +155,9 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
   `tail` argument away but would grow the block without bound on long sessions). If duplicates of that
   shape keep appearing, the next step is one `retrieve_memories` per candidate with the top hits fed to
   a second, smaller haiku call.
-- [-] **`shellcheck contrib/claude/hooks/*.sh` exits 1 on an info-level false positive** (2026-09-08,
-  pre-existing). SC2016 on the `sed -n '/^```/,/^```/...'` fence-stripping line in `alexandria-extract.sh`:
-  the backticks are a regex, not an unexpanded command substitution. Everything else is clean. Add a
-  `# shellcheck disable=SC2016` on that line if shellcheck ever gates anything.
+- [x] Done 2026-09-08: **`shellcheck contrib/claude/hooks/*.sh` exits 0.** A `# shellcheck disable=SC2016`
+  on the fence-stripping `sed` line in `alexandria-extract.sh`; the backticks there are a regex, not an
+  unexpanded command substitution.
 - [ ] **A queued follow-up prompt lands in the previous turn's chunk.** If the user types the next
   prompt while a turn is still generating, Claude Code dispatches it as soon as the turn ends, inside
   the 1 s flush wait, so the extract hook sees it with the previous turn. Harmless (it is extracted
