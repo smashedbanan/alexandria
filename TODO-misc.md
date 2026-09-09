@@ -23,6 +23,16 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
   in the binary crate and the builder in `alexandria-mcp`, and `main.rs` always overrides the builder
   from config, so the builder value only reaches tests. Add an assertion in `src/config.rs` tests if it
   ever drifts again.
+- [ ] **The AGENTS.md retrieval note is stale and contradicts `docs/configuration.md`** (2026-09-09,
+  noticed while triaging this file for the next item to take). `AGENTS.md:43` gives
+  `retrieve.min_similarity` a default of `0.30`; the real default is `0.10` (`src/config.rs:172`,
+  `crates/alexandria-mcp/src/server.rs:51`, `docs/configuration.md:46` and the table at `:117`). The
+  same sentence then tells future agents that the pi client threshold `0.58` "sits deliberately above
+  this floor — keep that ordering if you tune either", while `docs/configuration.md:180` says `0.58`
+  predates measurement, drops most real hits on MiniLM, and recommends `0.35` (the `contrib/claude`
+  hook already defaults to `0.35`). So the line misstates the number *and* prescribes an ordering the
+  docs call wrong. Same root cause as the `cargo fmt --check` line fixed in 172e407: AGENTS.md drifts
+  from the recipes and docs it summarizes and nothing checks it. Documentation only; no code is wrong.
 - [-] **`CandleProvider::set_cls_pooling` is public API that exists only for one test** (2026-09-09).
   Integration tests cannot see `cfg(test)` items, so the hook is `pub` behind `#[doc(hidden)]`. A cargo
   feature gate (`test-util`, self dev-dependency) would hide it properly; add one if a second such hook
