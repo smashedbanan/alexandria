@@ -70,14 +70,11 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
 
 - [-] **Extraction keeps the Pi `error-resolution` tag unimplemented** (2026-09-09, remainder of the
   tool-error entry closed the same day). `alexandria-extract.sh` serializes `is_error` tool results as
-  `[Tool error]: <tool> <first 120 chars of its input> -- <first 300 chars>`, joined through
-  `tool_use_id` (a result whose call is not in the chunk keeps the bare form), and leaves pairing
+  `[Tool error]: <tool> <its command or file path, else the first 120 chars of its input JSON> --
+  <first 300 chars>` (2026-09-09; other tools keep the JSON form, add a field when one gets noisy),
+  joined through `tool_use_id` (a result whose call is not in the chunk keeps the bare form), and leaves pairing
   and root-cause judgement to haiku. Accepted noise: permission denials, worktree-isolation refusals,
   and user rejections still go in. Add the tag filter only if junk memories of that shape appear.
-- [ ] **Tool input in `[Tool error]` lines is cut at 120 characters of raw JSON** (2026-09-09), so a
-  long Bash command truncates mid-string and the `description` field is usually lost. Readable enough
-  for haiku today; the fix is `input.command // input.file_path` per tool. Do it or accept it for good
-  and drop this entry.
 - [-] **Stop-hook extraction makes one haiku call per turn** (2026-09-08, retry dropped). The retry on an
   empty first result rested on one observation (empty, then three memories on the same prompt) and
   doubled the cost of every tactical turn; the extract log showed only the second call failing, on
