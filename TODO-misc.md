@@ -88,23 +88,32 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
 
 ## Claude Code integration
 
-- [ ] **Error-resolution tracker not ported.** `contrib/claude/hooks/` now has auto-recall,
-  session_id injection, correction/preference detectors, and Stop-hook LLM extraction
-  (plan: `docs/plans/2026-09-08-todo-misc-plan.md`). The Pi error-resolution detector was
-  deliberately skipped: it needs PostToolUse state across a turn and yields low-signal
-  "Error with X / Resolution: <200 chars>" memories; the extraction pass captures root causes
-  once resolved. Revisit only if extracted memories turn out to miss resolved errors.
-- [ ] **Retry doubles cost on tactical turns.** Every turn where haiku correctly finds nothing now pays a
-  second call (up to ~80 s wall, hidden by async). Watch the `extracted` volume; if it is mostly
-  noise or the cost matters, drop the retry or gate it on transcript size.
-- [ ] **`CLAUDE_CODE_ENTRYPOINT` is undocumented** (2026-09-08). The hooks default auto-store off
-  when this internal env var matches `sdk-*`; observed on Claude Code 2.1.263 (`cli` interactive,
-  `sdk-cli` for `claude -p`).
-  The `sdk-*` glob is meant to also cover Agent SDK harnesses, but those values are assumed, not
-  observed: third-party harnesses and the Agent SDK run on API billing only, and the subscription
-  plan cannot drive them, so they cannot be checked from this machine. If a release renames the
-  variable the hooks silently fall back to the old always-on behaviour; after Claude Code upgrades,
-  re-run a throwaway `claude -p` and confirm no session or marker files appear.
+- [-] **Extraction sees failed tool results, but not which tool or whether the retry worked** (2026-09-08,
+  replaces the "port the Pi error-resolution tracker" item). `alexandria-extract.sh` now serializes
+  `is_error` tool results as `[Tool error]: <first 300 chars>` next to the user/assistant text, minus
+  `<tool_use_error>` harness refusals, and leaves pairing and root-cause judgement to haiku. Accepted
+  noise: permission denials, worktree-isolation refusals, and user rejections still go in (each is a
+  one-liner; the prompt already excludes common knowledge). Not done: tool-name attribution, which
+  needs the `tool_use_id` joined back to the previous assistant line, and the Pi `error-resolution`
+  tag. Add the filter if junk memories of that shape ever appear; add attribution if haiku's output
+  turns out to need it. Error text counts toward `ALEXANDRIA_EXTRACT_MIN_CHARS`, so error-heavy
+  sessions extract a turn earlier.
+- [-] **`alexandria-recall.sh` and `alexandria-session.sh` still exit on their guards before reading
+  stdin** (2026-09-08). `alexandria-extract.sh` was changed to read first because `test.sh` runs it as
+  a bare `jq | hook` pipeline under `set -eo pipefail`, and a guard exit before the read let jq take
+  SIGPIPE (flaky exit 141, both trees). The other two are only ever piped inside `$(...)` in the test,
+  where the writer's status is ignored, and Claude Code as the caller does not care either. Move the
+  read up if either hook ever gets a bare-pipeline test.
+- [-] **Stop-hook extraction makes one haiku call per turn** (2026-09-08, retry dropped). The retry on an
+  empty first result rested on one observation (empty, then three memories on the same prompt) and
+  doubled the cost of every tactical turn; the extract log showed only the second call failing, on
+  the shrunken timeout. If `extracted` volume drops noticeably, restore the loop gated on transcript
+  size rather than unconditionally.
+- [-] **The `sdk-*` gate does not cover other non-interactive entrypoints** (2026-09-08). The 2.1.263 binary
+  also knows `claude-code-github-action`, `local-agent`, `remote`, `remote_cowork`, `remote_baku`, and
+  `bench`, none of which match `sdk-*`, so auto-store stays on there. Nothing here runs in those surfaces
+  yet. Widen the `case` in `alexandria-recall.sh` / `alexandria-extract.sh` if one is ever used with these
+  hooks installed.
 - [-] **Hook development in a live interactive session pollutes the real database.** Companion to the
   `CLAUDE_CODE_ENTRYPOINT` item: the installed Stop hook extracts from this session's transcript too, so stub
   payloads and probe strings from tests pasted into the conversation become `extracted` memories (a
@@ -113,6 +122,21 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
   2026-09-08: nothing in the hook can tell a pasted stub payload from a real conversation, so the
   headless fix does not apply. Accepted mitigation: start the developing session with
   `ALEXANDRIA_AUTO_STORE=off`, or delete by hand afterwards.
+- [-] **`extract.log` is append-only and never rotated** (2026-09-08). The detached extract copy appends
+  its stderr to `$XDG_RUNTIME_DIR/alexandria/extract.log` for the life of the login session, and a hook
+  file edited while a detached copy is mid-run leaves stale noise there (today: three "LLM call 2
+  failed" lines and a line-118 syntax error from a half-written edit, none reproducible by the
+  committed script). Truncated by hand 2026-09-08. Rotate only if it ever grows past a few KB.
+- [ ] **Extraction dedups within a session only, so the same gotcha is stored once per session that hits
+  it** (2026-09-08). The `<already_stored>` block in `alexandria-extract.sh` is `get_session` for the
+  current session; auto-recall on 2026-09-08 returned three `extracted` memories from three sessions all
+  saying "hook development in a live session pollutes the database". Cheapest fix: before storing, run
+  `retrieve_memories` on each candidate and skip above some similarity; or feed the top recall hits for the
+  turn into `<already_stored>` alongside the session list. Needs a threshold measurement first.
+- [-] **`shellcheck contrib/claude/hooks/*.sh` exits 1 on an info-level false positive** (2026-09-08,
+  pre-existing). SC2016 on the `sed -n '/^```/,/^```/...'` fence-stripping line in `alexandria-extract.sh`:
+  the backticks are a regex, not an unexpanded command substitution. Everything else is clean. Add a
+  `# shellcheck disable=SC2016` on that line if shellcheck ever gates anything.
 - [ ] **A queued follow-up prompt lands in the previous turn's chunk.** If the user types the next
   prompt while a turn is still generating, Claude Code dispatches it as soon as the turn ends, inside
   the 1 s flush wait, so the extract hook sees it with the previous turn. Harmless (it is extracted
