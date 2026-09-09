@@ -31,11 +31,10 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
   derivation rule** (2026-09-08). The rule gives 0.08 for MiniLM; 0.10 was kept as-is because the
   incumbent won and the difference is immaterial. If a model swap ever lands, the doc comment and the
   configuration table should cite the rule in the design plan rather than restating measured ranges.
-- [-] **`alexandria-pipeline` unit tests now need the real model** (2026-09-08, d4bc3eb). The CLS-vs-mean
-  test sits in `candle.rs` under `#[cfg(test)]` because it flips the private pooling flag, so
-  `cargo test -p alexandria-pipeline --lib` downloads MiniLM on a cold cache where before only the
-  `tests/` integration tests did. Accepted; if it bothers anyone, expose a test-only constructor and
-  move the test to `tests/embedding_test.rs` with the other slow ones.
+- [-] **`CandleProvider::set_cls_pooling` is public API that exists only for one test** (2026-09-09).
+  Integration tests cannot see `cfg(test)` items, so the hook is `pub` behind `#[doc(hidden)]`. A cargo
+  feature gate (`test-util`, self dev-dependency) would hide it properly; add one if a second such hook
+  appears.
 - [-] **Boot could refuse an unlocked corpus instead of warning.** Parked 2026-09-08: needs an escape
   hatch (e.g. `migrate-embeddings --assume-model`) so a pre-lock database can still be stamped, and the
   population is almost certainly nonexistent. Add both together if one ever turns up.
@@ -122,10 +121,9 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
   2026-09-08: nothing in the hook can tell a pasted stub payload from a real conversation, so the
   headless fix does not apply. Accepted mitigation: start the developing session with
   `ALEXANDRIA_AUTO_STORE=off`, or delete by hand afterwards.
-- [-] **Marker pruning is a fixed 7 days and runs only from the Stop hook** (2026-09-09). The window is a
-  literal in `alexandria-extract.sh`'s `find -mtime +7`; `.stored` markers from the recall hook are only
-  pruned when a Stop hook fires on the same machine. Both fine as long as one Claude Code install is in
-  play. Add an `ALEXANDRIA_MARKER_MAX_AGE_DAYS` env var if the window ever needs tuning.
+- [-] **Marker pruning runs only from the Stop hook** (2026-09-09). `.stored` markers from the recall hook
+  are only pruned when a Stop hook fires on the same machine. Fine as long as one Claude Code install is
+  in play; add the same `find` to `alexandria-recall.sh` if a recall-only install ever accumulates them.
 - [-] **A stray `extract.log` from the first location is still in `$XDG_RUNTIME_DIR/alexandria/`**
   (2026-09-09). Predates both moves, nothing writes it, and the tmpfs clears it at logout. Left alone.
   `docs/plans/2026-09-08-todo-misc-plan.md` also still names the runtime-dir paths; it is a historical
