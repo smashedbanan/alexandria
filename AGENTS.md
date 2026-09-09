@@ -91,6 +91,8 @@ Both must pass clean first. Do not skip the gate to "just see if it compiles".
 - `README.md` — feature/tool overview, quick start, deployment (systemd, Docker), debug UI
 - `docs/configuration.md` — every server and client config key, env overrides, XDG migration
 - `docs/session-memory.md` — session data model, lifecycle, tool semantics, current limitations
+- `docs/minilm-test-data.md` — retrieval measurements for the embedding model, how to rerun
+  `alexandria bench-retrieval`, metric definitions, and the frozen question set
 - `docs/roadmap.md` — shipped milestones and planned work
 - `docs/plans/` — dated design/implementation plans for completed work (historical, not maintained)
 - `contrib/pi/README.md` — how the pi skill and extension differ and install

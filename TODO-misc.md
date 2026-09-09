@@ -26,12 +26,12 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
 
 ### Embedding migration follow-ups (deferred from the 2026-09-08 branch review)
 
-- [-] **The rewritten floor rule has only been applied on paper** (2026-09-08). `nonhit_p50` and the
-  `< hit_min` check were read off the existing measurements tables; no script computes them. The bench
-  tooling is not in the tree: the candle bench example was deleted with the first pass and the second
-  pass ran through a throwaway sentence-transformers script in `/tmp/alexandria-bench`, recipe recorded
-  in the measurements doc. Accepted as-is 2026-09-09: the model question is closed, so no bench is
-  planned. If one is ever rerun, derive the floor from its own output and confirm the table.
+- [x] Done 2026-09-09: **The rewritten floor rule has only been applied on paper.** `alexandria
+  bench-retrieval` (`src/bench.rs`) now computes `nonhit_p50` and the `< hit_min` check from the
+  model's own output and prints both. Third pass recorded in the measurements doc: the rule gives
+  0.07 on the live 743-fact corpus and 0.08 on the reconstructed baseline, against the 0.10 default,
+  all far below `hit_min` 0.338 — so no config change. The baseline row reproduces the 2026-09-08
+  table on every column and every per-question rank, which is what makes the live row comparable.
 - [-] **The `AlexandriaServer` builder default for `retrieve_min_similarity` is kept equal to
   `RetrieveConfig` by hand** (2026-09-09, both 0.10). No test asserts they match: the config type lives
   in the binary crate and the builder in `alexandria-mcp`, and `main.rs` always overrides the builder
@@ -54,6 +54,58 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
 - [-] **Boot could refuse an unlocked corpus instead of warning.** Parked 2026-09-08: needs an escape
   hatch (e.g. `migrate-embeddings --assume-model`) so a pre-lock database can still be stamped, and the
   population is almost certainly nonexistent. Add both together if one ever turns up.
+
+### Retrieval benchmark follow-ups (2026-09-09)
+
+- [ ] **Retrieval degrades as the corpus grows, and nothing tracks it.** The third pass in the
+  measurements doc puts the same 12 questions against 143 facts and against today's 743: `mean_rank`
+  1.42 -> 2.75, `top1` 9/12 -> 7/12, `mean_gap` +0.148 -> +0.077. `hit_min` and `hit_max` are
+  identical across both rows, so the targets score exactly what they always did — the loss is purely
+  more facts crowding above them. At 5x the corpus the gap has already halved; nothing says the trend
+  is linear, and nothing is watching it. Rerun `alexandria bench-retrieval` at the next significant
+  corpus size before concluding anything about the shape of the curve. If the gap keeps closing, the
+  levers are a reranker over the top N, hybrid keyword+vector scoring, or a larger model — the
+  2026-09-08 passes only ruled larger models out at 143 facts, which is no longer the operating point.
+- [ ] **The question set only targets facts from the original 143.** All 12 targets predate
+  2026-09-08 16:26 UTC, so the 590 facts added since are never a correct answer, only distractors.
+  That makes the third pass a clean measurement of "fixed questions against a growing haystack",
+  which is what was wanted here, but it is not a measurement of retrieval quality on current
+  material — nothing checks that a memory stored last week can be found at all. Add questions
+  targeting recent facts before reading the bench as a general quality signal.
+- [ ] **`bench-retrieval` is not in `README.md`.** `docs/minilm-test-data.md` now carries the run
+  recipe, the metric definitions and the operating requirement (SurrealKV is single-writer, so it
+  needs the server stopped or a copy of the data dir via `ALEXANDRIA_DATA_DIR`), and the Docs Map in
+  AGENTS.md points at it. Still absent from `README.md` — which does not mention any subcommand,
+  `migrate-embeddings` included; that one is documented in `docs/configuration.md:78` instead. So the
+  gap is really that the README never lists the CLI surface, not that this one command was missed.
+- [-] **`docs/minilm-test-data.md` goes stale silently** (2026-09-09, created with the third pass).
+  Its results section is a snapshot of a 743-fact corpus that grows every session, so the numbers
+  become wrong-but-plausible rather than obviously wrong — there is no "as of" check, only the date in
+  the heading. Nothing regenerates it and nothing compares it to a fresh `bench-retrieval` run. Parked
+  because the fix is either a CI job that needs the live corpus (which CI does not have) or a
+  discipline that will not hold; the date in the heading is the mitigation. Same shape of risk: the
+  headline numbers are repeated in the pointer left at the end of
+  `docs/plans/2026-09-08-embedding-model-swap-measurements.md`, so a future rerun has two places to
+  update and only one of them is the maintained doc.
+- [-] **The baseline pass reconstructs by size, not identity** (2026-09-09). `BASELINE_SIZE = 143`
+  takes the 143 oldest active facts, which is not the same set as the 143 that were active on
+  2026-09-08: any of those deleted since drops out and the window reaches forward to replace it. It
+  reproduced the recorded table exactly this time, so the drift is currently zero-to-negligible, but
+  it grows monotonically with every deletion and there is no way to detect it from inside the tool.
+  A timestamp cutoff cannot be substituted — see the next item. If the baseline row ever stops
+  reproducing, suspect this before suspecting the metrics.
+- [-] **The measurements doc's "08:08 data copy" is local time and misleads** (2026-09-09). It reads
+  as a UTC timestamp, but no active fact predates 2026-09-08 12:30 UTC: `08:08` is UTC-4 and is when
+  the data dir was created, not when the measurement ran. A cutoff built from it selects nothing,
+  which is how the size-based reconstruction above came about. Left as written since the third-pass
+  section now explains it; worth remembering that every other bare timestamp in these plan docs is
+  local too.
+- [-] **The floor rule now yields 0.07 against a 0.10 default** (2026-09-09, live corpus; 0.08 on the
+  baseline). No change made: `hit_min` is 0.338, so both sit far below the weakest true hit and the
+  difference is immaterial for the same reason recorded in the first pass. Noted because
+  `docs/configuration.md:117` still states "the rule gives 0.08 for MiniLM" as a fixed property of the
+  model — it is a property of the model *and the corpus*, and it drifts down as the corpus grows.
+  Fold that into the next edit of that table rather than touching it alone.
 
 ## Build / toolchain
 
