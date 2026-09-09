@@ -80,11 +80,15 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
   doubled the cost of every tactical turn; the extract log showed only the second call failing, on
   the shrunken timeout. If `extracted` volume drops noticeably, restore the loop gated on transcript
   size rather than unconditionally.
-- [ ] **The `sdk-*` gate does not cover other non-interactive entrypoints** (2026-09-08). The 2.1.263 binary
-  also knows `claude-code-github-action`, `local-agent`, `remote`, `remote_cowork`, `remote_baku`, and
-  `bench`, none of which match `sdk-*`, so auto-store stays on there. Nothing here runs in those surfaces
-  yet, but widening the `case` is one line each in `alexandria-recall.sh:108` and
-  `alexandria-extract.sh:27`.
+- [-] **The entrypoint gate is a denylist read off the 2.1.263 bundle** (2026-09-09, closes the "`sdk-*`
+  gate does not cover other entrypoints" item). Off: `sdk-*`, `mcp`, `bench`, `claude-code-github-action`,
+  `claude-security` (a guess from the name; nothing in the bundle says what it is), `*_trigger`, and Cowork
+  (`local-agent`, `claude-coworker*`, `remote_cowork`; turned off 2026-09-09 after first being left on).
+  Deliberately on: the `remote*` / Slack / Teams family, since a human types those prompts (and the remote
+  ones cannot reach a local server). An allowlist on `cli` was rejected: it would silently turn memory off in `claude-desktop`
+  and `claude-vscode`, and a rename would fail closed. The validator table (26 values) is only in the
+  bundle, so a new headless entrypoint lands on by default until someone re-reads it; re-grep
+  `$Yt={cli:!0,...}` in `/opt/claude-code/bin/claude` after upgrades that add surfaces.
 - [-] **Hook development in a live interactive session pollutes the real database.** Companion to the
   `CLAUDE_CODE_ENTRYPOINT` item: the installed Stop hook extracts from this session's transcript too, so stub
   payloads and probe strings from tests pasted into the conversation become `extracted` memories (a
