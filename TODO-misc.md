@@ -93,9 +93,10 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
   2026-09-08: nothing in the hook can tell a pasted stub payload from a real conversation, so the
   headless fix does not apply. Accepted mitigation: start the developing session with
   `ALEXANDRIA_AUTO_STORE=off`, or delete by hand afterwards.
-- [ ] **Marker pruning runs only from the Stop hook** (2026-09-09). `.stored` markers from the recall hook
-  are only pruned when a Stop hook fires on the same machine. Fine as long as one Claude Code install is
-  in play; the fix is copying the `find` from `alexandria-extract.sh:45` into `alexandria-recall.sh`.
+- [-] **The marker-prune `find` is duplicated by hand in both hooks** (2026-09-09, closes the "runs only
+  from the Stop hook" item). `alexandria-recall.sh` now prunes on every prompt with the same expression as
+  `alexandria-extract.sh`; nothing checks they match. Two identical lines beat a sourced helper for now;
+  factor one out if a third hook needs it or the expression changes.
 - [-] **Cross-session extraction dedup covers only what the prompts recalled** (2026-09-08, replaces
   the "dedups within a session only" item). `alexandria-extract.sh` now adds the recall hook's hits, read
   from the `hook_additional_context` attachment lines in the transcript chunk, to `<already_stored>`.
