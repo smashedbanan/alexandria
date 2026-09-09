@@ -52,20 +52,21 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
 
 ## Build / toolchain
 
-- [ ] **Windows `rustflags` (msvc/gnu/gnullvm targets) added 2026-09-08 but unverified.** `.cargo/config.toml`
-  sets `target-cpu=x86-64-v2` for the three Windows targets alongside the Linux `mold` target; there's
-  no Windows toolchain in this environment to cross-compile and confirm they take effect.
 - [-] **The `hub.rs` download itself is still unexercised by the service** (2026-09-08). The service reinstall
   (f996e35) only proved the cache-first branch, since `~/.cache/huggingface/hub/models--sentence-transformers--all-MiniLM-L6-v2`
   was already populated. The download branch has only run under `cargo test`. To exercise it for real:
   move that directory aside, restart the service, confirm the fetch in the journal, then delete the
   moved copy. Parked; do it the next time the cache is wiped anyway.
 
-- [ ] **Startup memory doubled during model load (2026-09-08).** `candle.rs` now reads the safetensors
+- [-] **Startup memory doubled during model load (2026-09-08).** `candle.rs` reads the safetensors
   file into a `Vec<u8>` (`from_buffered_safetensors`) instead of mmap, so the workspace can carry
-  `unsafe_code = "forbid"`. For MiniLM (~90 MB) the buffer plus the built tensors coexist briefly at
-  boot, then the buffer drops. Revisit only if a much larger model is adopted; the escape hatch is a
-  `#[allow(unsafe_code)]` on that one call plus `from_mmaped_safetensors`.
+  `unsafe_code = "forbid"`. For MiniLM (~90 MB) the buffer and the built tensors coexist until
+  `BertModel::load` returns, then the buffer drops; there is no earlier drop point in safe code.
+  Parked 2026-09-08: mmap would not remove the copy either (candle still copies each tensor out of
+  the map; the source bytes just become reclaimable page cache), and streaming tensors through the
+  `safetensors` reader into a `HashMap` holds the same peak. Revisit only if a much larger model is
+  adopted; the escape hatch is a `#[allow(unsafe_code)]` on that one call plus
+  `from_mmaped_safetensors`.
 
 ## Dependencies
 
@@ -79,8 +80,8 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
   sentence-transformers repo ships the file, so this never fires today); two servers first-booting
   on the same empty cache both download (rename-into-place keeps the result correct); gated or
   private models cannot be fetched. Add whichever one actually bites.
-- [ ] **Two `tokenizers` versions compile** until candle bumps: candle-core 0.11 still pins 0.22, we're
-  on 0.23. Behaviourally harmless; revert ours to 0.22 if the duplicate build cost bothers anyone.
+- [-] **`tokenizers` is held at 0.22 to match candle-core 0.11** (2026-09-08; was 0.23, which built a
+  second copy). Bump the workspace pin together with the next candle bump that moves its own.
 - [ ] **Transitive "Unchanged" `cargo update` entries are upstream pins, not ours.** `generic-array`
   0.14.7, `i_float`/`i_overlay`/`i_shape`, `matchit` 0.8.4, `pdqselect` 0.1.0 stay put even after
   the direct bumps above; they move when the pulling crate (surrealdb stack) does.
