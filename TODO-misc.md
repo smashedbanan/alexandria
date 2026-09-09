@@ -139,17 +139,25 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
   2026-09-08: nothing in the hook can tell a pasted stub payload from a real conversation, so the
   headless fix does not apply. Accepted mitigation: start the developing session with
   `ALEXANDRIA_AUTO_STORE=off`, or delete by hand afterwards.
-- [x] Done 2026-09-09: **`extract.log` moved to `~/.cargo/logs/alexandria/` and rotated by size.** The
+- [x] Done 2026-09-09: **`extract.log` lives in `$XDG_STATE_HOME/alexandria/` and is rotated by size.** The
   parent hook renames it to `extract.log.1` once it passes 1 MiB, before each detached re-exec; one
-  generation kept. `~/.cargo` is cargo's directory, not an XDG one; `$XDG_STATE_HOME/alexandria/`
-  is the conventional spot if that ever matters. Was `$XDG_RUNTIME_DIR/alexandria/extract.log`,
-  append-only, wiped at logout.
+  generation kept. Moved twice the same day: `$XDG_RUNTIME_DIR` (append-only, wiped at logout) to
+  `~/.cargo/logs/alexandria/`, then to the XDG state dir, which is where logs conventionally go.
 
-- [ ] **Per-session marker files pile up in `$XDG_RUNTIME_DIR/alexandria/`** (2026-09-09). Every session
-  leaves a `<session_id>.extracted` and, when the session hook fires, a `<session_id>.stored`; 120+ from
-  one day of use. Wiped at logout with the tmpfs, and each is a few bytes, so harmless until a
-  long-lived login session. If it matters: prune markers older than N days from the extract hook's
-  parent path, next to the log rotation.
+- [x] Done 2026-09-09: **Per-session marker files moved to `$XDG_STATE_HOME/alexandria/` and pruned.**
+  `<session_id>.extracted` and `<session_id>.stored` sit next to `extract.log`; the extract hook's parent
+  path deletes any idle for over 7 days (`find -mtime +7`), right after the log rotation. They now survive
+  logout, so a resumed session never re-extracts from line 0; one resumed after 7 idle days re-extracts
+  once with dedup and may re-store a detector hit. Was `$XDG_RUNTIME_DIR/alexandria/`, 120+ files a day,
+  wiped with the tmpfs.
+- [-] **Marker pruning is a fixed 7 days and runs only from the Stop hook** (2026-09-09). The window is a
+  literal in `alexandria-extract.sh`'s `find -mtime +7`; `.stored` markers from the recall hook are only
+  pruned when a Stop hook fires on the same machine. Both fine as long as one Claude Code install is in
+  play. Add an `ALEXANDRIA_MARKER_MAX_AGE_DAYS` env var if the window ever needs tuning.
+- [-] **A stray `extract.log` from the first location is still in `$XDG_RUNTIME_DIR/alexandria/`**
+  (2026-09-09). Predates both moves, nothing writes it, and the tmpfs clears it at logout. Left alone.
+  `docs/plans/2026-09-08-todo-misc-plan.md` also still names the runtime-dir paths; it is a historical
+  plan and was not updated.
 - [-] **Cross-session extraction dedup covers only what the prompts recalled** (2026-09-08, replaces
   the "dedups within a session only" item). `alexandria-extract.sh` now adds the recall hook's hits, read
   from the `hook_additional_context` attachment lines in the transcript chunk, to `<already_stored>`.
