@@ -55,13 +55,8 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
 - [ ] **Windows `rustflags` (msvc/gnu/gnullvm targets) added 2026-09-08 but unverified.** `.cargo/config.toml`
   sets `target-cpu=x86-64-v2` for the three Windows targets alongside the Linux `mold` target; there's
   no Windows toolchain in this environment to cross-compile and confirm they take effect.
-- [ ] Done 2026-09-08: **Installed service binary is behind the tree.** `~/.cargo/bin/alexandria` (17:06, sha 61f12bc…)
-  predates e0356fc (`hf-hub` -> `hub.rs`); the service has never run the reqwest downloader path. When
-  convenient: `cargo install --path crates/alexandria` and `systemctl --user restart alexandria`.
-  Reinstalled at f996e35 (sha 1db33669…) and restarted; boot log shows the model served from the warm
-  cache in ~0.3 s.
-- [-] **The `hub.rs` download itself is still unexercised by the service** (2026-09-08). The reinstall
-  above only proved the cache-first branch, since `~/.cache/huggingface/hub/models--sentence-transformers--all-MiniLM-L6-v2`
+- [-] **The `hub.rs` download itself is still unexercised by the service** (2026-09-08). The service reinstall
+  (f996e35) only proved the cache-first branch, since `~/.cache/huggingface/hub/models--sentence-transformers--all-MiniLM-L6-v2`
   was already populated. The download branch has only run under `cargo test`. To exercise it for real:
   move that directory aside, restart the service, confirm the fetch in the journal, then delete the
   moved copy. Parked; do it the next time the cache is wiped anyway.
@@ -71,13 +66,6 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
   `unsafe_code = "forbid"`. For MiniLM (~90 MB) the buffer plus the built tensors coexist briefly at
   boot, then the buffer drops. Revisit only if a much larger model is adopted; the escape hatch is a
   `#[allow(unsafe_code)]` on that one call plus `from_mmaped_safetensors`.
-
-- [ ] **jj user-level email is the private address.** `~/.config/jj/config.toml` sets `user.email =
-  newtlord-github@pm.me`, so `jj git push` to GitHub fails with "push declined due to email privacy
-  restrictions" (GH007) on any commit jj authored. 2026-09-08: this repo got a repo-level override to the
-  noreply address (`jj config set --repo user.email ...`) and the eight unpushed commits were rewritten
-  with `jj metaedit --update-author`. Every other jj repo pushed to GitHub will hit the same error until
-  the user-level value changes: `jj config set --user user.email '160296478+smashedbanan@users.noreply.github.com'`.
 
 ## Dependencies
 
@@ -108,23 +96,16 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
 - [ ] **Retry doubles cost on tactical turns.** Every turn where haiku correctly finds nothing now pays a
   second call (up to ~80 s wall, hidden by async). Watch the `extracted` volume; if it is mostly
   noise or the cost matters, drop the retry or gate it on transcript size.
-- [ ] Done 2026-09-08: **Headless experiments write to the live server.** Any `claude -p` run on this machine fires the
-  installed hooks, so a stub extractor's output (or haiku's) lands in the real database under a
-  throwaway session id; 2026-09-08 testing left six `stub` memories that had to be deleted by hand.
-  Fixed: `claude -p` sets `CLAUDE_CODE_ENTRYPOINT=sdk-cli` (interactive is `cli`), so both store
-  paths (detectors in `alexandria-recall.sh`, extraction in `alexandria-extract.sh`) now default
-  auto-store off when the entrypoint matches `sdk-*`; `ALEXANDRIA_AUTO_STORE=on` opts back in.
-  Recall and session-id injection stay on. Verified with a real `claude -p 'always use tabs ...'`
-  run: no session created, no marker files.
-- [ ] **`CLAUDE_CODE_ENTRYPOINT` is undocumented** (2026-09-08). The headless guard above keys on an
-  internal env var observed on Claude Code 2.1.263 (`cli` interactive, `sdk-cli` for `claude -p`).
+- [ ] **`CLAUDE_CODE_ENTRYPOINT` is undocumented** (2026-09-08). The hooks default auto-store off
+  when this internal env var matches `sdk-*`; observed on Claude Code 2.1.263 (`cli` interactive,
+  `sdk-cli` for `claude -p`).
   The `sdk-*` glob is meant to also cover Agent SDK harnesses, but those values are assumed, not
   observed: third-party harnesses and the Agent SDK run on API billing only, and the subscription
   plan cannot drive them, so they cannot be checked from this machine. If a release renames the
-  variable the hooks silently fall back to the old always-on behaviour; re-run the `claude -p`
-  check above after Claude Code upgrades.
+  variable the hooks silently fall back to the old always-on behaviour; after Claude Code upgrades,
+  re-run a throwaway `claude -p` and confirm no session or marker files appear.
 - [-] **Hook development in a live interactive session pollutes the real database.** Companion to the
-  headless item above: the installed Stop hook extracts from this session's transcript too, so stub
+  `CLAUDE_CODE_ENTRYPOINT` item: the installed Stop hook extracts from this session's transcript too, so stub
   payloads and probe strings from tests pasted into the conversation become `extracted` memories (a
   "Detach debug probe" memory from 2026-09-08 surfaced in auto-recall today). `test.sh` itself is
   clean (own session id, deletes on exit); the leak is the interactive session around it. Parked
