@@ -43,14 +43,15 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
   adopted; the escape hatch is a `#[allow(unsafe_code)]` on that one call plus
   `from_mmaped_safetensors`.
 
-- [ ] **`just lint` and `just check` still lack `--workspace`** (2026-09-09, companion to the `just test`
-  fix the same day). The root `Cargo.toml` is both a `[package]` and a `[workspace]`, so a bare
-  `cargo <cmd>` there defaults to the root package alone, not the members — `just test` was silently
-  running 27 of 145 tests until `--workspace` was added. `lint` (`cargo clippy --all-targets
-  --all-features`) and `check` have the identical shape and so cover only the root crate today.
-  Verified safe to fix: `cargo clippy --workspace --all-targets -- -D warnings` is clean on the tree
-  as of 2026-09-09, so adding `--workspace` to both surfaces no new failures. Left out of the
-  `just test` change only to keep that diff to the one recipe.
+- [-] **`just lint` is duplicated by hand in `.githooks/pre-commit`** (2026-09-09, noticed while adding
+  `--workspace` to the lint/check recipes). The hook repeats the clippy invocation verbatim instead of
+  calling `just lint`, and nothing checks the two match — the `--workspace` gap had to be fixed in both
+  places. Left duplicated so the hook keeps working without `just` on PATH; collapse it to `just lint`
+  if the recipe grows again.
+- [ ] **The AGENTS.md build gate still documents `cargo fmt --check` without `--all`** (2026-09-09,
+  companion to the clippy line fixed the same day). Same root cause as the `--workspace` items: the root
+  `Cargo.toml` is both a `[package]` and a `[workspace]`, so a bare `cargo fmt --check` formats only the
+  root crate while `just fmt` runs `cargo fmt --all -- --check`. Documentation only; no recipe is wrong.
 - [-] **`jj resolve --tool :theirs <file>` resolves every conflicted hunk in the file, not just the one
   you are thinking about** (2026-09-09, learned during the cebarks/alexandria upstream sync). The sync
   plan's rules described one hunk per file ("take upstream's paragraph, append our sentence"), but

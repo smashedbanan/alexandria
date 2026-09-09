@@ -52,7 +52,7 @@ These will bite you. SurrealDB 3.2 differs from docs and prior versions:
 Before any `cargo check`, `cargo run`, or `cargo build`, run these in order and fix what they report:
 
 1. `cargo fmt --check`
-2. `cargo clippy -- -D warnings`
+2. `cargo clippy --workspace --all-targets --all-features -- -D warnings` (or just `just lint`)
 
 Both must pass clean first. Do not skip the gate to "just see if it compiles".
 
