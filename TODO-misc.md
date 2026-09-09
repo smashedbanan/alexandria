@@ -10,6 +10,20 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
   so linking `raw` needs a new edge table plus a schema migration, and nothing reads it. Add one if a
   session view ever needs the source document directly.
 
+### `list_sessions` follow-ups (2026-09-09)
+
+- [ ] **`docs/session-memory.md` still describes a stored `memory_count`.** The Lifecycle block says
+  `count++` and the `store_memory` row says "bumps the counter"; `v006` dropped the column and both
+  `get_session` and `list_sessions` compute the count live. Two lines, documentation only.
+- [-] **No debug UI page for sessions.** `/debug` covers memories, clusters, graph, and maintenance;
+  sessions are reachable only through the MCP tools or a direct query. Parked 2026-09-09: `list_sessions`
+  covers the "which session was that" case from a client. Add a page if session triage from the browser
+  is ever needed — `SessionRepo::list` already returns everything a list view would show.
+- [-] **`list_sessions` cannot search summaries.** Filters are `agent_id` / `tag` / `finalized` only;
+  finding a session by what its summary says means paging. Parked 2026-09-09: substring `CONTAINS` on
+  `summary` is one clause if wanted; semantic search would mean embedding summaries on finalize, which
+  is a schema change and a separate task.
+
 ### Embedding migration follow-ups (deferred from the 2026-09-08 branch review)
 
 - [-] **The rewritten floor rule has only been applied on paper** (2026-09-08). `nonhit_p50` and the
