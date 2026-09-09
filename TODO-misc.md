@@ -12,9 +12,10 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
 
 ### `list_sessions` follow-ups (2026-09-09)
 
-- [ ] **`docs/session-memory.md` still describes a stored `memory_count`.** The Lifecycle block says
-  `count++` and the `store_memory` row says "bumps the counter"; `v006` dropped the column and both
-  `get_session` and `list_sessions` compute the count live. Two lines, documentation only.
+- [x] Done 2026-09-09: **`docs/session-memory.md` still describes a stored `memory_count`.** Five
+  places, not the two estimated: the schema block still listed the dropped column, the "denormalized
+  counter maintained on write" sentence, both `count++` lifecycle comments, the `ended_at` paragraph,
+  and the `store_memory` tools row. All now say the count is computed live.
 - [-] **No debug UI page for sessions.** `/debug` covers memories, clusters, graph, and maintenance;
   sessions are reachable only through the MCP tools or a direct query. Parked 2026-09-09: `list_sessions`
   covers the "which session was that" case from a client. Add a page if session triage from the browser
@@ -26,27 +27,16 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
 
 ### Embedding migration follow-ups (deferred from the 2026-09-08 branch review)
 
-- [x] Done 2026-09-09: **The rewritten floor rule has only been applied on paper.** `alexandria
-  bench-retrieval` (`src/bench.rs`) now computes `nonhit_p50` and the `< hit_min` check from the
-  model's own output and prints both. Third pass recorded in the measurements doc: the rule gives
-  0.07 on the live 743-fact corpus and 0.08 on the reconstructed baseline, against the 0.10 default,
-  all far below `hit_min` 0.338 — so no config change. The baseline row reproduces the 2026-09-08
-  table on every column and every per-question rank, which is what makes the live row comparable.
 - [-] **The `AlexandriaServer` builder default for `retrieve_min_similarity` is kept equal to
   `RetrieveConfig` by hand** (2026-09-09, both 0.10). No test asserts they match: the config type lives
   in the binary crate and the builder in `alexandria-mcp`, and `main.rs` always overrides the builder
   from config, so the builder value only reaches tests. Add an assertion in `src/config.rs` tests if it
   ever drifts again.
-- [ ] **The AGENTS.md retrieval note is stale and contradicts `docs/configuration.md`** (2026-09-09,
-  noticed while triaging this file for the next item to take). `AGENTS.md:43` gives
-  `retrieve.min_similarity` a default of `0.30`; the real default is `0.10` (`src/config.rs:172`,
-  `crates/alexandria-mcp/src/server.rs:51`, `docs/configuration.md:46` and the table at `:117`). The
-  same sentence then tells future agents that the pi client threshold `0.58` "sits deliberately above
-  this floor — keep that ordering if you tune either", while `docs/configuration.md:180` says `0.58`
-  predates measurement, drops most real hits on MiniLM, and recommends `0.35` (the `contrib/claude`
-  hook already defaults to `0.35`). So the line misstates the number *and* prescribes an ordering the
-  docs call wrong. Same root cause as the `cargo fmt --check` line fixed in 172e407: AGENTS.md drifts
-  from the recipes and docs it summarizes and nothing checks it. Documentation only; no code is wrong.
+- [x] Done 2026-09-09: **The AGENTS.md retrieval note is stale and contradicts
+  `docs/configuration.md`.** Corrected `0.30` to `0.10` and dropped the "keep that ordering"
+  prescription. The line no longer restates either threshold — it says both are measured and points
+  at `docs/minilm-test-data.md` and `docs/configuration.md`, so this particular drift cannot recur.
+  Same sweep found the test count in AGENTS.md at 147 against an actual 151; updated too.
 - [-] **`CandleProvider::set_cls_pooling` is public API that exists only for one test** (2026-09-09).
   Integration tests cannot see `cfg(test)` items, so the hook is `pub` behind `#[doc(hidden)]`. A cargo
   feature gate (`test-util`, self dev-dependency) would hide it properly; add one if a second such hook
@@ -66,18 +56,20 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
   corpus size before concluding anything about the shape of the curve. If the gap keeps closing, the
   levers are a reranker over the top N, hybrid keyword+vector scoring, or a larger model — the
   2026-09-08 passes only ruled larger models out at 143 facts, which is no longer the operating point.
+  Fourth point added 2026-09-09 by the threshold-sweep run: 807 facts, `mean_rank` 2.83, one
+  per-question rank change against the 743 row. That bounds short-term jitter as far smaller than
+  the 143 -> 743 move, but 64 facts is not the "next significant corpus size" this item is asking
+  for — it does not narrow the shape of the curve.
 - [ ] **The question set only targets facts from the original 143.** All 12 targets predate
   2026-09-08 16:26 UTC, so the 590 facts added since are never a correct answer, only distractors.
   That makes the third pass a clean measurement of "fixed questions against a growing haystack",
   which is what was wanted here, but it is not a measurement of retrieval quality on current
   material — nothing checks that a memory stored last week can be found at all. Add questions
   targeting recent facts before reading the bench as a general quality signal.
-- [ ] **`bench-retrieval` is not in `README.md`.** `docs/minilm-test-data.md` now carries the run
-  recipe, the metric definitions and the operating requirement (SurrealKV is single-writer, so it
-  needs the server stopped or a copy of the data dir via `ALEXANDRIA_DATA_DIR`), and the Docs Map in
-  AGENTS.md points at it. Still absent from `README.md` — which does not mention any subcommand,
-  `migrate-embeddings` included; that one is documented in `docs/configuration.md:78` instead. So the
-  gap is really that the README never lists the CLI surface, not that this one command was missed.
+- [x] Done 2026-09-09: **`bench-retrieval` is not in `README.md`.** Fixed as diagnosed — the gap
+  was the missing CLI surface, not the one command. README now has a `## Command Line` section
+  covering the bare invocation, both subcommands and `--help`, matching `USAGE` in `src/main.rs`,
+  plus the single-writer caveat. `docs/minilm-test-data.md` added to the Documentation table.
 - [-] **`docs/minilm-test-data.md` goes stale silently** (2026-09-09, created with the third pass).
   Its results section is a snapshot of a 743-fact corpus that grows every session, so the numbers
   become wrong-but-plausible rather than obviously wrong — there is no "as of" check, only the date in
@@ -100,6 +92,22 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
   which is how the size-based reconstruction above came about. Left as written since the third-pass
   section now explains it; worth remembering that every other bare timestamp in these plan docs is
   local too.
+- [ ] **`ALEXANDRIA_AUTO_RECALL_LIMIT` is an untuned lever and is the binding constraint for some
+  questions** (2026-09-09, from the threshold sweep). At `T = 0.30` every one of the 12 targets clears
+  the threshold on score, yet only 10 are delivered: two rank 8th and 7th, outside the hook's
+  `limit = 5`, so no threshold can reach them. For those questions the threshold is irrelevant and the
+  limit is the whole story. Nothing has ever measured what `limit` should be — 5 is the value both
+  clients inherited unexamined. The sweep already computes `hits_delivered` against `RECALL_LIMIT`, so
+  sweeping the limit instead of the threshold is a small change to `src/bench.rs`. Do that before
+  touching the threshold again; raising the limit and lowering the threshold trade against each other
+  and only one of the two has been measured.
+- [-] **The pi extension default now diverges further from upstream** (2026-09-09). Flipping
+  `recallMinSimilarity` from `0.58` to `0.35` in `contrib/pi/extensions/alexandria-auto-recall/src/config.ts`
+  closes the "pending a change to the extension" note that `docs/configuration.md` carried, but
+  `contrib/pi` is fork content synced against cebarks/alexandria and this file is a known merge
+  surface (`docs/plans/2026-09-09-upstream-sync.md:31`). The divergence was previously documentation
+  only and is now behavioural. Expect a conflict on the next sync, and per the `:theirs` lesson below,
+  do not resolve it blanket — upstream has no counterpart for the measurement this value rests on.
 - [-] **The floor rule now yields 0.07 against a 0.10 default** (2026-09-09, live corpus; 0.08 on the
   baseline). No change made: `hit_min` is 0.338, so both sit far below the weakest true hit and the
   difference is immaterial for the same reason recorded in the first pass. Noted because
