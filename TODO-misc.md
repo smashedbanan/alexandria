@@ -139,11 +139,17 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
   2026-09-08: nothing in the hook can tell a pasted stub payload from a real conversation, so the
   headless fix does not apply. Accepted mitigation: start the developing session with
   `ALEXANDRIA_AUTO_STORE=off`, or delete by hand afterwards.
-- [-] **`extract.log` is append-only and never rotated** (2026-09-08). The detached extract copy appends
-  its stderr to `$XDG_RUNTIME_DIR/alexandria/extract.log` for the life of the login session, and a hook
-  file edited while a detached copy is mid-run leaves stale noise there (today: three "LLM call 2
-  failed" lines and a line-118 syntax error from a half-written edit, none reproducible by the
-  committed script). Truncated by hand 2026-09-08. Rotate only if it ever grows past a few KB.
+- [x] Done 2026-09-09: **`extract.log` moved to `~/.cargo/logs/alexandria/` and rotated by size.** The
+  parent hook renames it to `extract.log.1` once it passes 1 MiB, before each detached re-exec; one
+  generation kept. `~/.cargo` is cargo's directory, not an XDG one; `$XDG_STATE_HOME/alexandria/`
+  is the conventional spot if that ever matters. Was `$XDG_RUNTIME_DIR/alexandria/extract.log`,
+  append-only, wiped at logout.
+
+- [ ] **Per-session marker files pile up in `$XDG_RUNTIME_DIR/alexandria/`** (2026-09-09). Every session
+  leaves a `<session_id>.extracted` and, when the session hook fires, a `<session_id>.stored`; 120+ from
+  one day of use. Wiped at logout with the tmpfs, and each is a few bytes, so harmless until a
+  long-lived login session. If it matters: prune markers older than N days from the extract hook's
+  parent path, next to the log rotation.
 - [-] **Cross-session extraction dedup covers only what the prompts recalled** (2026-09-08, replaces
   the "dedups within a session only" item). `alexandria-extract.sh` now adds the recall hook's hits, read
   from the `hook_additional_context` attachment lines in the transcript chunk, to `<already_stored>`.
