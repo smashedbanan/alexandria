@@ -79,6 +79,26 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
   headline numbers are repeated in the pointer left at the end of
   `docs/plans/2026-09-08-embedding-model-swap-measurements.md`, so a future rerun has two places to
   update and only one of them is the maintained doc.
+- [ ] **`docs/configuration.md` now recommends `bench-retrieval` to anyone switching models, but
+  the tool only works on this corpus** (2026-09-09, introduced by that same edit). The "Switching
+  models on an existing database" paragraph now says `alexandria bench-retrieval` derives
+  `[retrieve] min_similarity` and `[recall] min_similarity` from the new model's output. True here,
+  false everywhere else: `QUESTIONS` in `src/bench.rs` hardcodes twelve `fact:` record IDs from this
+  install, so on any other database every target is absent. `compute()` skips absent targets by
+  design, so the run does not fail — it prints `0/12 questions scored` above a row of `NaN` and `inf`,
+  and the floor rule's sanity check compares against an infinite `hit_min`. The `0/12` is a clear
+  enough signal to a reader who looks, but the advice in the config doc does not warn them. Either
+  qualify that paragraph as install-specific, or make `run()` bail when `scored == 0` with a message
+  naming the cause. The second is three lines and makes the doc honest without a caveat.
+- [-] **Prose in `src/config.rs` doc comments duplicates `docs/configuration.md` and nothing checks
+  them** (2026-09-09, found while closing the floor-rule item). That item named
+  `docs/configuration.md:117` as the one place claiming "the rule gives 0.08 for MiniLM"; the same
+  sentence was also in the `min_similarity` doc comment at `src/config.rs:100`, so fixing only what
+  the TODO named would have left the stale claim live in the source. The two are written independently
+  and drift independently. Not worth a mechanism — the same shape as the AGENTS.md drift, and the same
+  mitigation applies: when a doc comment and the config reference would both carry a measured number,
+  put it in one and point at it from the other. Grep `src/config.rs` for the value before closing any
+  future "stale number in configuration.md" item.
 - [-] **The baseline pass reconstructs by size, not identity** (2026-09-09). `BASELINE_SIZE = 143`
   takes the 143 oldest active facts, which is not the same set as the 143 that were active on
   2026-09-08: any of those deleted since drops out and the window reaches forward to replace it. It
@@ -108,12 +128,11 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
   surface (`docs/plans/2026-09-09-upstream-sync.md:31`). The divergence was previously documentation
   only and is now behavioural. Expect a conflict on the next sync, and per the `:theirs` lesson below,
   do not resolve it blanket — upstream has no counterpart for the measurement this value rests on.
-- [-] **The floor rule now yields 0.07 against a 0.10 default** (2026-09-09, live corpus; 0.08 on the
-  baseline). No change made: `hit_min` is 0.338, so both sit far below the weakest true hit and the
-  difference is immaterial for the same reason recorded in the first pass. Noted because
-  `docs/configuration.md:117` still states "the rule gives 0.08 for MiniLM" as a fixed property of the
-  model — it is a property of the model *and the corpus*, and it drifts down as the corpus grows.
-  Fold that into the next edit of that table rather than touching it alone.
+- [x] Done 2026-09-09: **The floor rule now yields 0.07 against a 0.10 default** (live corpus; 0.08
+  on the baseline). `0.10` still stands — `hit_min` is 0.338, so every candidate floor sits far below
+  the weakest true hit. The stale claim that "the rule gives 0.08 for MiniLM" is fixed in both places
+  it lived, `docs/configuration.md` and the `min_similarity` doc comment in `src/config.rs`; both now
+  say the result depends on the corpus as well as the model and drifts down as the corpus grows.
 
 ## Build / toolchain
 
