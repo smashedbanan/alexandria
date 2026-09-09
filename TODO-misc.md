@@ -70,10 +70,10 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
   adopted; the escape hatch is a `#[allow(unsafe_code)]` on that one call plus
   `from_mmaped_safetensors`.
 
-- [ ] **The installed service predates the `batch_size` boot check** (2026-09-08). The check moved into
-  `Config::load_from` in the tree, but the running service binary was built before it, so a zero in
-  `config.toml` still boots there until the next rebuild and restart. The hooks are symlinked and
-  already live.
+- [x] Done 2026-09-09: **The installed service predates the `batch_size` boot check.** Rebuilt with
+  `cargo install --path crates/alexandria` from 255dde7 and restarted the user unit; the installed binary
+  now refuses `ALEXANDRIA_EMBEDDING_BATCH_SIZE=0` with "embedding.batch_size must be at least 1" before
+  opening the database.
 
 ## Dependencies
 
