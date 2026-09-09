@@ -2,6 +2,17 @@
 
 Open items noticed while getting Alexandria running under Claude Code (2026-09-08).
 
+## This file
+
+- [ ] **23 of 27 entries are `[-]`; this is a decision journal with four TODOs in it**
+  (2026-09-09, from the adversarial review pass). `[-]` means "parked, here is why" and most entries
+  are write-ups of finished work — the "Claude Code integration" section is seven entries, all `[-]`,
+  most opening "closes the X item". The actionable `[ ]` items are buried among them and nobody
+  scanning this file finds them first (counts as of 2026-09-09). Split the rationale into
+  `DECISIONS.md` and leave `[ ]` items here, or accept that this is a journal and rename it. Not
+  done unilaterally: which entries are rationale and which are deferred work is a judgement call
+  per entry.
+
 ## Server
 
 - [-] **`raw` record carries no session.** The 2026-09-08 `import_document` session linkage attaches
@@ -12,14 +23,11 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
 
 ### `list_sessions` follow-ups (2026-09-09)
 
-- [x] Done 2026-09-09: **`docs/session-memory.md` still describes a stored `memory_count`.** Five
-  places, not the two estimated: the schema block still listed the dropped column, the "denormalized
-  counter maintained on write" sentence, both `count++` lifecycle comments, the `ended_at` paragraph,
-  and the `store_memory` tools row. All now say the count is computed live.
-- [-] **No debug UI page for sessions.** `/debug` covers memories, clusters, graph, and maintenance;
-  sessions are reachable only through the MCP tools or a direct query. Parked 2026-09-09: `list_sessions`
-  covers the "which session was that" case from a client. Add a page if session triage from the browser
-  is ever needed — `SessionRepo::list` already returns everything a list view would show.
+- [-] **No debug UI page for sessions.** `/debug` covers memories, clusters, graph, maintenance,
+  and query; sessions are reachable only through the MCP tools or a direct query. Parked 2026-09-09:
+  `list_sessions` covers the "which session was that" case from a client. Add a page if session
+  triage from the browser is ever needed — `SessionRepo::list` already returns everything a list
+  view would show.
 - [-] **`list_sessions` cannot search summaries.** Filters are `agent_id` / `tag` / `finalized` only;
   finding a session by what its summary says means paging. Parked 2026-09-09: substring `CONTAINS` on
   `summary` is one clause if wanted; semantic search would mean embedding summaries on finalize, which
@@ -27,91 +35,75 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
 
 ### Embedding migration follow-ups (deferred from the 2026-09-08 branch review)
 
-- [-] **The `AlexandriaServer` builder default for `retrieve_min_similarity` is kept equal to
-  `RetrieveConfig` by hand** (2026-09-09, both 0.10). No test asserts they match: the config type lives
-  in the binary crate and the builder in `alexandria-mcp`, and `main.rs` always overrides the builder
-  from config, so the builder value only reaches tests. Add an assertion in `src/config.rs` tests if it
-  ever drifts again.
-- [x] Done 2026-09-09: **The AGENTS.md retrieval note is stale and contradicts
-  `docs/configuration.md`.** Corrected `0.30` to `0.10` and dropped the "keep that ordering"
-  prescription. The line no longer restates either threshold — it says both are measured and points
-  at `docs/minilm-test-data.md` and `docs/configuration.md`, so this particular drift cannot recur.
-  Same sweep found the test count in AGENTS.md at 147 against an actual 151; updated too.
 - [-] **`CandleProvider::set_cls_pooling` is public API that exists only for one test** (2026-09-09).
   Integration tests cannot see `cfg(test)` items, so the hook is `pub` behind `#[doc(hidden)]`. A cargo
   feature gate (`test-util`, self dev-dependency) would hide it properly; add one if a second such hook
   appears.
-- [-] **Boot could refuse an unlocked corpus instead of warning.** Parked 2026-09-08: needs an escape
-  hatch (e.g. `migrate-embeddings --assume-model`) so a pre-lock database can still be stamped, and the
-  population is almost certainly nonexistent. Add both together if one ever turns up.
 
 ### Retrieval benchmark follow-ups (2026-09-09)
 
-- [ ] **Retrieval degrades as the corpus grows, and nothing tracks it.** The third pass in the
-  measurements doc puts the same 12 questions against 143 facts and against today's 743: `mean_rank`
-  1.42 -> 2.75, `top1` 9/12 -> 7/12, `mean_gap` +0.148 -> +0.077. `hit_min` and `hit_max` are
-  identical across both rows, so the targets score exactly what they always did — the loss is purely
-  more facts crowding above them. At 5x the corpus the gap has already halved; nothing says the trend
-  is linear, and nothing is watching it. Rerun `alexandria bench-retrieval` at the next significant
-  corpus size before concluding anything about the shape of the curve. If the gap keeps closing, the
-  levers are a reranker over the top N, hybrid keyword+vector scoring, or a larger model — the
-  2026-09-08 passes only ruled larger models out at 143 facts, which is no longer the operating point.
-  Fourth point added 2026-09-09 by the threshold-sweep run: 807 facts, `mean_rank` 2.83, one
-  per-question rank change against the 743 row. That bounds short-term jitter as far smaller than
-  the 143 -> 743 move, but 64 facts is not the "next significant corpus size" this item is asking
-  for — it does not narrow the shape of the curve. Fifth point 2026-09-09 while verifying the
-  `scored == 0` guard: 830 facts, `mean_rank` still 2.83, `top1` still 7/12, `hit_min` 0.338 —
-  unchanged from the 807 row, same caveat, still not the corpus jump this item wants.
+- [-] **Rank inflates as the corpus grows; the data is logged, not tracked.** Five passes of the same
+  12 questions: 143 facts `mean_rank` 1.42 / `top1` 9/12 / `mean_gap` +0.148; 743 -> 2.75, 7/12,
+  +0.077; 807 -> 2.83; 830 -> 2.83, 7/12, `hit_min` 0.338 (830 is approximate — see the live-copy
+  item below). Reframed 2026-09-09 under adversarial review, having been filed as "retrieval degrades
+  as the corpus grows": one jump carries that whole claim, the last three passes are flat, and rank
+  inflation under 5x more distractors is the null hypothesis rather than a finding. `hit_min` and
+  `hit_max` are identical across every row, so absolute scores — which is what the client threshold
+  actually filters on — have not moved at all. The only channel by which rank inflation reaches a
+  user is `limit = 5` truncation, which is the `ALEXANDRIA_AUTO_RECALL_LIMIT` item below; act there,
+  not here. Keep appending a pass at each significant corpus size, and reopen this as a defect only
+  if `hit_min` starts moving.
 - [ ] **The question set only targets facts from the original 143.** All 12 targets predate
   2026-09-08 16:26 UTC, so the 590 facts added since are never a correct answer, only distractors.
   That makes the third pass a clean measurement of "fixed questions against a growing haystack",
   which is what was wanted here, but it is not a measurement of retrieval quality on current
   material — nothing checks that a memory stored last week can be found at all. Add questions
   targeting recent facts before reading the bench as a general quality signal.
-- [x] Done 2026-09-09: **`bench-retrieval` is not in `README.md`.** Fixed as diagnosed — the gap
-  was the missing CLI surface, not the one command. README now has a `## Command Line` section
-  covering the bare invocation, both subcommands and `--help`, matching `USAGE` in `src/main.rs`,
-  plus the single-writer caveat. `docs/minilm-test-data.md` added to the Documentation table.
-- [-] **`docs/minilm-test-data.md` goes stale silently** (2026-09-09, created with the third pass).
-  Its results section is a snapshot of a 743-fact corpus that grows every session, so the numbers
-  become wrong-but-plausible rather than obviously wrong — there is no "as of" check, only the date in
-  the heading. Nothing regenerates it and nothing compares it to a fresh `bench-retrieval` run. Parked
-  because the fix is either a CI job that needs the live corpus (which CI does not have) or a
-  discipline that will not hold; the date in the heading is the mitigation. Same shape of risk: the
-  headline numbers are repeated in the pointer left at the end of
-  `docs/plans/2026-09-08-embedding-model-swap-measurements.md`, so a future rerun has two places to
-  update and only one of them is the maintained doc.
-- [x] Done 2026-09-09: **`docs/configuration.md` now recommends `bench-retrieval` to anyone
-  switching models, but the tool only works on this corpus** (2026-09-09, introduced by that same edit). The "Switching
-  models on an existing database" paragraph now says `alexandria bench-retrieval` derives
-  `[retrieve] min_similarity` and `[recall] min_similarity` from the new model's output. True here,
-  false everywhere else: `QUESTIONS` in `src/bench.rs` hardcodes twelve `fact:` record IDs from this
-  install, so on any other database every target is absent. `compute()` skips absent targets by
-  design, so the run does not fail — it prints `0/12 questions scored` above a row of `NaN` and `inf`,
-  and the floor rule's sanity check compares against an infinite `hit_min`. The `0/12` is a clear
-  enough signal to a reader who looks, but the advice in the config doc does not warn them. Took the
-  second option: `run()` now bails with `anyhow::ensure!(live_metrics.scored > 0, ...)` before any
-  output, so an install without the frozen targets gets an error naming QUESTIONS and the frozen-set
-  cause instead of a NaN table and a `floor < inf` sanity check. Exits 1. `docs/configuration.md:78`
-  left as written, per the option chosen. Verified both ways against a copy of the live data dir:
-  12/12 unchanged on the real corpus, and the guard fires with the target IDs temporarily rewritten
-  to absent ones.
-- [-] **Prose in `src/config.rs` doc comments duplicates `docs/configuration.md` and nothing checks
-  them** (2026-09-09, found while closing the floor-rule item). That item named
-  `docs/configuration.md:117` as the one place claiming "the rule gives 0.08 for MiniLM"; the same
-  sentence was also in the `min_similarity` doc comment at `src/config.rs:100`, so fixing only what
-  the TODO named would have left the stale claim live in the source. The two are written independently
-  and drift independently. Not worth a mechanism — the same shape as the AGENTS.md drift, and the same
-  mitigation applies: when a doc comment and the config reference would both carry a measured number,
-  put it in one and point at it from the other. Grep `src/config.rs` for the value before closing any
-  future "stale number in configuration.md" item.
-- [-] **The `scored == 0` bail guards the live pass only** (2026-09-09, added with that guard). The
-  baseline pass is the oldest `BASELINE_SIZE` of the live corpus, so a live corpus that scores at all
-  normally carries the targets into the baseline window too, and a live corpus that scores zero never
-  reaches the baseline report. The uncovered case needs a database holding those exact record IDs
-  where all twelve are outside the oldest 143 — not reachable from any real corpus this tool runs on.
-  Guard the baseline separately only if `BASELINE_SIZE` ever stops meaning "the original install".
-
+- [-] **Measured numbers are duplicated across docs and source, and nothing checks them** (2026-09-09).
+  `docs/minilm-test-data.md`'s results section is a snapshot of a 743-fact corpus that grows every
+  session, so its numbers go wrong-but-plausible rather than obviously wrong; nothing regenerates it
+  and nothing compares it against a fresh `bench-retrieval` run, and there is no "as of" check beyond
+  the date in the heading. The same headline numbers are repeated in the pointer at the end of
+  `docs/plans/2026-09-08-embedding-model-swap-measurements.md`, and the retrieve-floor derivation
+  lives in both `docs/configuration.md` and the `min_similarity` doc comment in `src/config.rs` —
+  fixing only the file a TODO names leaves the stale claim live in the other. Parked: a CI job would
+  need the live corpus (CI has none) and a discipline will not hold. Rule of thumb instead of a
+  mechanism: when a measured number would appear in two places, put it in one and point at it from
+  the other, and grep `src/config.rs` before closing any future "stale number in configuration.md"
+  item.
+- [-] **The `bench-retrieval` baseline pass is reconstructed by size, not recorded** (2026-09-09).
+  `BASELINE_SIZE = 143` takes the 143 oldest active facts, which is not the same set as the 143 that
+  were active on 2026-09-08. It reproduced the recorded table exactly this time. Two ways it can drift
+  with nothing noticing, neither detectable from inside the tool: deleting a fact *inside* the window
+  lets the window reach forward to replace it (deletions outside it are harmless — the "grows
+  monotonically with every deletion" claim this item carried until 2026-09-09 was wrong), and
+  `update_memory` keeps the record ID while rewriting the content, so any of the twelve frozen
+  `QUESTIONS` targets can silently start measuring different text with every metric still looking
+  comparable. The second is the likelier of the two, since the question set is frozen by ID and
+  nothing about editing a memory warns you it is a benchmark target. A timestamp cutoff cannot be
+  substituted: the measurements doc's "08:08 data copy" reads as UTC but is UTC-4 and is when the
+  data dir was created — no active fact predates 2026-09-08 12:30 UTC, so a cutoff built from it
+  selects nothing, which is how the size-based reconstruction came about (every other bare timestamp
+  in these plan docs is local too). If the baseline row ever stops reproducing, suspect this before
+  suspecting the metrics.
+- [ ] **`bench-retrieval` silently truncates the corpus at 100,000 facts, oldest-first** (2026-09-09,
+  found by adversarial review). `src/bench.rs` reads the corpus with
+  `MemoryRepo::list(None, None, false, 100_000, 0)`, and `memory_repo.rs:146` orders
+  `created_at DESC` — so past 100k facts `all` holds the *newest* 100k. The baseline window then
+  stops being the original install entirely, and the frozen `QUESTIONS` targets, every one of them
+  from the original 143, fall out of the corpus. The `scored == 0` bail only fires if all twelve
+  vanish at once; losing four just shifts every metric with no signal at all. Same corruption as the
+  baseline drift above, reached by growth instead of deletion. 120x away at 830 facts — and the
+  corpus went 143 -> 830 in two days. The fix is a bail when `all.len()` reaches the cap, not a
+  bigger cap.
+- [-] **`bench-retrieval` sorts `created_at: None` facts to the front of the baseline window**
+  (2026-09-09, found by the same review). `by_age.sort_by_key` in `src/bench.rs` keys on
+  `Option<DateTime>`, and `None` orders before `Some`, so a fact with no timestamp would displace a
+  genuine oldest fact from the 143. The adjacent `oldest`/`newest` log lines `filter_map` the `None`s
+  away, so the function is inconsistent with itself about whether they can occur. Parked because they
+  cannot: `v001_initial.surql:16` declares `created_at ON fact TYPE datetime DEFAULT time::now()`, so
+  reaching this needs a direct write that bypasses the schema default. Recorded rather than fixed so
+  the next reader of that sort does not have to re-derive why it is safe.
 - [-] **The `bench-retrieval` corpus copy was taken from a live data dir** (2026-09-09). `README.md:55-57`
   says to stop the server for the `cp` and then run against the copy via `ALEXANDRIA_DATA_DIR`; the
   `scored == 0` verification skipped the stop and copied `~/.local/share/alexandria/data` while the
@@ -120,20 +112,6 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
   guaranteed consistent, and a silently truncated copy would look like a corpus-size data point rather
   than an error. Treat the 830 figure as approximate. Stop the server for any copy whose numbers get
   recorded in `docs/minilm-test-data.md`.
-
-- [-] **The baseline pass reconstructs by size, not identity** (2026-09-09). `BASELINE_SIZE = 143`
-  takes the 143 oldest active facts, which is not the same set as the 143 that were active on
-  2026-09-08: any of those deleted since drops out and the window reaches forward to replace it. It
-  reproduced the recorded table exactly this time, so the drift is currently zero-to-negligible, but
-  it grows monotonically with every deletion and there is no way to detect it from inside the tool.
-  A timestamp cutoff cannot be substituted — see the next item. If the baseline row ever stops
-  reproducing, suspect this before suspecting the metrics.
-- [-] **The measurements doc's "08:08 data copy" is local time and misleads** (2026-09-09). It reads
-  as a UTC timestamp, but no active fact predates 2026-09-08 12:30 UTC: `08:08` is UTC-4 and is when
-  the data dir was created, not when the measurement ran. A cutoff built from it selects nothing,
-  which is how the size-based reconstruction above came about. Left as written since the third-pass
-  section now explains it; worth remembering that every other bare timestamp in these plan docs is
-  local too.
 - [ ] **`ALEXANDRIA_AUTO_RECALL_LIMIT` is an untuned lever and is the binding constraint for some
   questions** (2026-09-09, from the threshold sweep). At `T = 0.30` every one of the 12 targets clears
   the threshold on score, yet only 10 are delivered: two rank 8th and 7th, outside the hook's
@@ -142,37 +120,39 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
   clients inherited unexamined. The sweep already computes `hits_delivered` against `RECALL_LIMIT`, so
   sweeping the limit instead of the threshold is a small change to `src/bench.rs`. Do that before
   touching the threshold again; raising the limit and lowering the threshold trade against each other
-  and only one of the two has been measured.
-- [-] **The pi extension default now diverges further from upstream** (2026-09-09). Flipping
-  `recallMinSimilarity` from `0.58` to `0.35` in `contrib/pi/extensions/alexandria-auto-recall/src/config.ts`
-  closes the "pending a change to the extension" note that `docs/configuration.md` carried, but
-  `contrib/pi` is fork content synced against cebarks/alexandria and this file is a known merge
-  surface (`docs/plans/2026-09-09-upstream-sync.md:31`). The divergence was previously documentation
-  only and is now behavioural. Expect a conflict on the next sync, and per the `:theirs` lesson below,
-  do not resolve it blanket — upstream has no counterpart for the measurement this value rests on.
-- [x] Done 2026-09-09: **The floor rule now yields 0.07 against a 0.10 default** (live corpus; 0.08
-  on the baseline). `0.10` still stands — `hit_min` is 0.338, so every candidate floor sits far below
-  the weakest true hit. The stale claim that "the rule gives 0.08 for MiniLM" is fixed in both places
-  it lived, `docs/configuration.md` and the `min_similarity` doc comment in `src/config.rs`; both now
-  say the result depends on the corpus as well as the model and drifts down as the corpus grows.
+  and only one of the two has been measured. The rank-inflation item above folds into this one: rank
+  only reaches a user through this limit.
+- [-] **The pi extension default diverges from upstream behaviourally, and will merge without a
+  conflict** (2026-09-09; premise corrected 2026-09-09). `recallMinSimilarity` in
+  `contrib/pi/extensions/alexandria-auto-recall/src/config.ts` is `0.35` against upstream's `0.58`,
+  which closes the "pending a change to the extension" note `docs/configuration.md` used to carry but
+  makes a previously documentation-only divergence behavioural. This item claimed the file was a known
+  merge surface, citing `docs/plans/2026-09-09-upstream-sync.md:31` — that line is
+  `alexandria-auto-recall/README.md`, and `config.ts` appears nowhere in that plan: it did not
+  conflict in the last sync. That is the risk, not the reassurance it reads as. A one-sided edit
+  conflicts only if upstream touches the same lines, so absent a conflict there is no review point,
+  and a blanket `:theirs` on any *other* conflict in that file reverts our value silently. Per the
+  `:theirs` lesson below, grep `config.ts` for `0.35` after every sync whether or not the merge
+  reported a conflict.
 
 ## Build / toolchain
 
-- [-] **Startup memory doubled during model load (2026-09-08).** `candle.rs` reads the safetensors
-  file into a `Vec<u8>` (`from_buffered_safetensors`) instead of mmap, so the workspace can carry
-  `unsafe_code = "forbid"`. For MiniLM (~90 MB) the buffer and the built tensors coexist until
-  `BertModel::load` returns, then the buffer drops; there is no earlier drop point in safe code.
-  Parked 2026-09-08: mmap would not remove the copy either (candle still copies each tensor out of
-  the map; the source bytes just become reclaimable page cache), and streaming tensors through the
-  `safetensors` reader into a `HashMap` holds the same peak. Revisit only if a much larger model is
-  adopted; the escape hatch is a `#[allow(unsafe_code)]` on that one call plus
+- [-] **mmap was rejected for model loading; the ~90 MB double peak is accepted** (2026-09-08).
+  `candle.rs` reads the safetensors file into a `Vec<u8>` (`from_buffered_safetensors`) instead of
+  mmap, so the workspace can carry `unsafe_code = "forbid"`. The buffer and the built tensors coexist
+  until `BertModel::load` returns, then the buffer drops; there is no earlier drop point in safe code.
+  Neither alternative removes the peak — candle still copies each tensor out of an mmap (the source
+  bytes just become reclaimable page cache), and streaming through the `safetensors` reader into a
+  `HashMap` holds the same peak — so there is nothing to do at MiniLM's size. Kept as a `[-]` only
+  because `candle.rs` carries no comment recording the choice; move it there and drop this. Escape
+  hatch if a much larger model is adopted: `#[allow(unsafe_code)]` on that one call plus
   `from_mmaped_safetensors`.
 
 - [-] **`.githooks/pre-commit` hard-depends on `just`** (2026-09-09, accepted when the hook was
   collapsed to `just fmt` / `just lint` and the hand-copied `cargo` invocations were deleted). A
   fallback to the literal commands would re-create the duplication the collapse removed, so there is
   none: without `just` on PATH the hook dies with `just: command not found`. Judged safe because the
-  only documented install path is `just install-hooks` (justfile:44), which already requires it, and
+  only documented install path is `just install-hooks` (justfile:45), which already requires it, and
   the failure is loud rather than silent. Add a fallback only if the hook starts being installed some
   other way. Related: the hook's own `→ just fmt` / `→ just lint` labels can no longer go stale, since
   `just` echoes each recipe body as it runs and so prints the real invocation underneath.
@@ -197,12 +177,11 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
 
 ## Dependencies
 
-- [-] **`tokenizers` still builds `onig`** (2026-09-08). candle-core 0.11 depends on tokenizers with
-  the `onig` feature itself, so our `default-features = false` cannot drop the C build. Goes away
-  only if a candle bump drops it; `fancy-regex` is the pure-Rust alternative if it ever becomes ours
-  to choose. Rechecked 2026-09-09: 0.11.0 (2026-06-26) is still the newest candle-core release.
-- [-] **`tokenizers` is held at 0.22 to match candle-core 0.11** (2026-09-08; was 0.23, which built a
-  second copy). Bump the workspace pin together with the next candle bump that moves its own.
+- [-] **`tokenizers` is pinned by candle-core 0.11** (2026-09-08). Held at 0.22 to match (0.23 built
+  a second copy), and candle-core depends on it with the `onig` feature itself, so our
+  `default-features = false` cannot drop the C build. Both move together on the next candle bump that
+  moves its own; `fancy-regex` is the pure-Rust alternative if the feature ever becomes ours to
+  choose. Rechecked 2026-09-09: 0.11.0 (2026-06-26) is still the newest candle-core release.
 - [-] **Transitive "Unchanged" `cargo update` entries are upstream pins, not ours.** `generic-array`
   0.14.7, `i_float`/`i_overlay`/`i_shape`, `matchit` 0.8.4, `pdqselect` 0.1.0 stay put even after
   the direct bumps above; they move when the pulling crate does. Rechecked 2026-09-09: `cargo update
@@ -221,6 +200,7 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
   joined through `tool_use_id` (a result whose call is not in the chunk keeps the bare form), and leaves pairing
   and root-cause judgement to haiku. Accepted noise: permission denials, worktree-isolation refusals,
   and user rejections still go in. Add the tag filter only if junk memories of that shape appear.
+  `contrib/claude/README.md:30` records the same non-port; keep the two in step or drop one.
 - [-] **Stop-hook extraction makes one haiku call per turn** (2026-09-08, retry dropped). The retry on an
   empty first result rested on one observation (empty, then three memories on the same prompt) and
   doubled the cost of every tactical turn; the extract log showed only the second call failing, on
