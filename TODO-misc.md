@@ -4,7 +4,7 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
 
 ## This file
 
-- [ ] **23 of 27 entries are `[-]`; this is a decision journal with four TODOs in it**
+- [ ] **28 of 32 entries are `[-]`; this is a decision journal with four TODOs in it**
   (2026-09-09, from the adversarial review pass). `[-]` means "parked, here is why" and most entries
   are write-ups of finished work — the "Claude Code integration" section is seven entries, all `[-]`,
   most opening "closes the X item". The actionable `[ ]` items are buried among them and nobody
@@ -42,17 +42,20 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
 
 ### Retrieval benchmark follow-ups (2026-09-09)
 
-- [-] **Rank inflates as the corpus grows; the data is logged, not tracked.** Five passes of the same
+- [-] **Rank inflates as the corpus grows; the data is logged, not tracked.** Six passes of the same
   12 questions: 143 facts `mean_rank` 1.42 / `top1` 9/12 / `mean_gap` +0.148; 743 -> 2.75, 7/12,
   +0.077; 807 -> 2.83; 830 -> 2.83, 7/12, `hit_min` 0.338 (830 is approximate — see the live-copy
-  item below). Reframed 2026-09-09 under adversarial review, having been filed as "retrieval degrades
-  as the corpus grows": one jump carries that whole claim, the last three passes are flat, and rank
-  inflation under 5x more distractors is the null hypothesis rather than a finding. `hit_min` and
+  item below); 880 -> 3.25, 7/12, +0.065, `hit_min` 0.338 (the limit-sweep pass, clean copy).
+  Reframed 2026-09-09 under adversarial review, having been filed as "retrieval degrades
+  as the corpus grows": one jump carries that whole claim, the later passes are near-flat, and rank
+  inflation under 6x more distractors is the null hypothesis rather than a finding. `hit_min` and
   `hit_max` are identical across every row, so absolute scores — which is what the client threshold
   actually filters on — have not moved at all. The only channel by which rank inflation reaches a
-  user is `limit = 5` truncation, which is the `ALEXANDRIA_AUTO_RECALL_LIMIT` item below; act there,
-  not here. Keep appending a pass at each significant corpus size, and reopen this as a defect only
-  if `hit_min` starts moving.
+  user is `limit` truncation, which is the `ALEXANDRIA_AUTO_RECALL_LIMIT` item below; acted on there
+  2026-09-09, and the grid shows the worst rank at 880 facts is 9, so the then-shipped `limit = 5`
+  hid three of the eleven targets that cleared its `T = 0.35` on score (four of twelve at
+  `T = 0.30`) — which is what moved the default to `10`/`0.45`. Keep appending a pass at each significant corpus size, and reopen this as a defect
+  only if `hit_min` starts moving.
 - [ ] **The question set only targets facts from the original 143.** All 12 targets predate
   2026-09-08 16:26 UTC, so the 590 facts added since are never a correct answer, only distractors.
   That makes the third pass a clean measurement of "fixed questions against a growing haystack",
@@ -111,20 +114,84 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
   matched the previous run, so nothing detectably tore — but an LSM tree copied mid-write is not
   guaranteed consistent, and a silently truncated copy would look like a corpus-size data point rather
   than an error. Treat the 830 figure as approximate. Stop the server for any copy whose numbers get
-  recorded in `docs/minilm-test-data.md`.
-- [ ] **`ALEXANDRIA_AUTO_RECALL_LIMIT` is an untuned lever and is the binding constraint for some
-  questions** (2026-09-09, from the threshold sweep). At `T = 0.30` every one of the 12 targets clears
-  the threshold on score, yet only 10 are delivered: two rank 8th and 7th, outside the hook's
-  `limit = 5`, so no threshold can reach them. For those questions the threshold is irrelevant and the
-  limit is the whole story. Nothing has ever measured what `limit` should be — 5 is the value both
-  clients inherited unexamined. The sweep already computes `hits_delivered` against `RECALL_LIMIT`, so
-  sweeping the limit instead of the threshold is a small change to `src/bench.rs`. Do that before
-  touching the threshold again; raising the limit and lowering the threshold trade against each other
-  and only one of the two has been measured. The rank-inflation item above folds into this one: rank
-  only reaches a user through this limit.
+  recorded in `docs/minilm-test-data.md` — the 880-fact limit-sweep pass did, via
+  `systemctl --user stop alexandria.service` around the `cp -a` alone (seconds of downtime), and its
+  baseline row reproduced the recorded 143-fact table exactly, which is the check that the copy held.
+- [-] **The recall limit is measured and applied: both clients now ship `limit = 10, T = 0.45`**
+  (2026-09-09, measured and applied the same day the sweep was built). The grid ran on an 880-fact
+  corpus copied with the server stopped, and is recorded in `docs/minilm-test-data.md` ("Result
+  limit"). The pair was chosen because it needs no view on how recall and noise should be priced:
+  the previous `limit = 5, T = 0.35` delivered 8 of 12 targets at 3.2 `noise_per_q`, and `10`/`0.45`
+  delivers the same 8 at 1.0 — identical recall at a third the injection, strictly dominating rather
+  than trading. `10`/`0.35` was the alternative (11 delivered at 4.7) and was passed over as a real
+  trade needing a judgement call. Delivery saturates at 10 because the worst target rank in the pass
+  is 9; 15 and 20 add only noise, so `LIMITS`'s guessed ceiling of 20 sits well past where it
+  matters and needs no widening. Lowering `T` to 0.30 from the old cell buys **zero** hits for +1.05
+  noise, which settles the original question: the limit is the lever, not the threshold. Two
+  non-obvious consequences, both now recorded at the sites: `0.45` is on the frontier *only* at
+  `limit = 10` (at 5 it was dominated by `0.50`, which is what `alexandria-recall.sh` used to warn
+  against), and `RECALL_LIMIT` moving to 10 means `bench-retrieval`'s single-limit threshold table no
+  longer reproduces the pre-2026-09-09 tables in `docs/minilm-test-data.md` — compare those against
+  the grid's `5` row instead. This discharges the rank-inflation item's "act there, not here" — rank
+  reaches a user only through this limit, and at 143 facts the worst rank was 4, so `limit = 5`
+  saturated and the lever was invisible. That item's standing ask (append a pass at each corpus size)
+  still stands.
+- [ ] **`limit = 10` has a shelf life and nothing watches it** (2026-09-09, from the pass that set
+  it). The value was chosen because delivery saturates there, and it saturates there because the
+  worst of the 12 target ranks at 880 facts is 9 — one below the window. That is a property of the
+  corpus, not the model, and rank has inflated at every pass (worst rank was 4 at 143 facts). So the
+  headroom is one position wide and shrinking, and when it goes the symptom is the one this whole
+  thread started with: targets that clear the threshold on score and are never delivered, with no
+  error and no log line. Nothing re-runs the grid and nothing alerts. Cheapest guard is to compare
+  `max(ranks)` against `RECALL_LIMIT` in `bench-retrieval`'s own output and say so out loud — the
+  numbers are already computed, it is a print and a comparison. Do that rather than raising the limit
+  pre-emptively, since every unit of limit costs noise permanently while the rank only occasionally
+  needs it.
+- [-] **The `0.45` and `10` literals in `config.ts` are unverified by anything** (2026-09-09, noticed
+  while applying them). `contrib/pi/` has no test suite and no local `typescript` — `package.json`
+  carries only `@types/node` and the pi SDK, so there is no `tsc` to run and no `npm test` to fail.
+  The two defaults were verified by reading. The failure mode is quiet in both directions: a typo'd
+  literal either becomes `NaN` through `Number()` and silently filters everything, or is simply a
+  wrong-but-valid number that degrades recall with no symptom. Parked rather than fixed because
+  adding a toolchain to a two-file extension to check two numeric literals is worse than the risk,
+  and AGENTS.md already records the no-test-suite fact generally. If `config.ts` grows real logic,
+  that trade flips.
+- [-] **`docs/minilm-test-data.md` now carries two generations of threshold reasoning** (2026-09-09,
+  a deliberate choice when the limit grid superseded the threshold sweep). The "Client threshold"
+  subsection argues its way to `0.35` and is wrong as advice; it is kept, behind a blockquote saying
+  so, because the grid's whole finding is what that argument had to overturn — at `limit = 5` the
+  middle of the threshold range really was dominated, and deleting the section would leave the "why
+  is 0.45 suddenly fine" question unanswerable. The cost is that the file now has a stale-looking
+  recommendation in it that a reader can quote out of context, and a future sweep would add a third
+  layer. If that happens, split the superseded argument into a dated subsection at the bottom rather
+  than growing the blockquote.
+- [-] **The `limit = 3` grid row silently narrows spreading activation and the sweep does not model
+  it** (2026-09-09, noticed while building the limit sweep). `alexandria-mcp/src/server.rs:460` fires
+  activation on `ranked.iter().take(activation_top_n)` with `ranked` already truncated to `limit` and
+  `activation.top_n` defaulting to 3. The useful half of that: any limit at or above 3 leaves
+  activation untouched, so *raising* the limit has no activation side effect and the grid's upper rows
+  are honest about their full cost. At exactly 3 the two levers couple, and below it activation would
+  quietly shrink with no signal. Parked because no client will be configured under 3 and dropping the
+  row would lose the noise-reduction end of the curve — but do not read the `limit = 3` row as a
+  recommendation without re-checking `activation.top_n` first.
+- [-] **A client recall default has to be applied in nine places by hand** (2026-09-09; filed as
+  "four places" and corrected the same day by the grep that applied the 5 -> 10 / 0.35 -> 0.45
+  change). The authoritative two are `contrib/claude/hooks/alexandria-recall.sh:31,37` and
+  `contrib/pi/extensions/alexandria-auto-recall/src/config.ts:75,86`. The other seven restate them:
+  `docs/configuration.md` twice (the `[recall]` example block and the key table), `src/bench.rs`
+  (`RECALL_LIMIT` plus the `THRESHOLDS` doc comment), `contrib/pi/README.md` (prose and example
+  block), `contrib/pi/extensions/alexandria-auto-recall/README.md` (example block and env table),
+  `contrib/pi/extensions/alexandria-auto-recall/src/index.ts` (header comment), `contrib/claude/README.md`
+  (env table), and `AGENTS.md` — which restated the threshold in the very line telling you not to, and
+  now names neither number. Nothing ties any of them together and nothing checks them. Per the
+  duplicated-measured-numbers rule above, grep the whole tree for the *old* value, not the files a
+  TODO names: the first four were the ones this item listed, and the count was still wrong by five.
+  `docs/plans/` hits are historical and deliberately left stale.
 - [-] **The pi extension default diverges from upstream behaviourally, and will merge without a
   conflict** (2026-09-09; premise corrected 2026-09-09). `recallMinSimilarity` in
-  `contrib/pi/extensions/alexandria-auto-recall/src/config.ts` is `0.35` against upstream's `0.58`,
+  `contrib/pi/extensions/alexandria-auto-recall/src/config.ts` is `0.45` (was `0.35` until the
+  2026-09-09 limit measurement) against upstream's `0.58`, and `recallLimit` is now `10` against
+  upstream's `5` — so the divergence is two keys, not one,
   which closes the "pending a change to the extension" note `docs/configuration.md` used to carry but
   makes a previously documentation-only divergence behavioural. This item claimed the file was a known
   merge surface, citing `docs/plans/2026-09-09-upstream-sync.md:31` — that line is
@@ -132,8 +199,9 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
   conflict in the last sync. That is the risk, not the reassurance it reads as. A one-sided edit
   conflicts only if upstream touches the same lines, so absent a conflict there is no review point,
   and a blanket `:theirs` on any *other* conflict in that file reverts our value silently. Per the
-  `:theirs` lesson below, grep `config.ts` for `0.35` after every sync whether or not the merge
-  reported a conflict.
+  `:theirs` lesson below, grep `config.ts` for `0.45` *and* `10` after every sync whether or not the
+  merge reported a conflict — and note that `10` is the harder of the two to eyeball, since
+  upstream's `5` is also a plausible-looking integer in that position.
 
 ## Build / toolchain
 
