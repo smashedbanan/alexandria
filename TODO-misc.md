@@ -43,15 +43,20 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
   adopted; the escape hatch is a `#[allow(unsafe_code)]` on that one call plus
   `from_mmaped_safetensors`.
 
-- [-] **`just lint` is duplicated by hand in `.githooks/pre-commit`** (2026-09-09, noticed while adding
-  `--workspace` to the lint/check recipes). The hook repeats the clippy invocation verbatim instead of
-  calling `just lint`, and nothing checks the two match — the `--workspace` gap had to be fixed in both
-  places. Left duplicated so the hook keeps working without `just` on PATH; collapse it to `just lint`
-  if the recipe grows again.
-- [ ] **The AGENTS.md build gate still documents `cargo fmt --check` without `--all`** (2026-09-09,
-  companion to the clippy line fixed the same day). Same root cause as the `--workspace` items: the root
-  `Cargo.toml` is both a `[package]` and a `[workspace]`, so a bare `cargo fmt --check` formats only the
-  root crate while `just fmt` runs `cargo fmt --all -- --check`. Documentation only; no recipe is wrong.
+- [-] **`.githooks/pre-commit` hard-depends on `just`** (2026-09-09, accepted when the hook was
+  collapsed to `just fmt` / `just lint` and the hand-copied `cargo` invocations were deleted). A
+  fallback to the literal commands would re-create the duplication the collapse removed, so there is
+  none: without `just` on PATH the hook dies with `just: command not found`. Judged safe because the
+  only documented install path is `just install-hooks` (justfile:44), which already requires it, and
+  the failure is loud rather than silent. Add a fallback only if the hook starts being installed some
+  other way. Related: the hook's own `→ just fmt` / `→ just lint` labels can no longer go stale, since
+  `just` echoes each recipe body as it runs and so prints the real invocation underneath.
+
+- [-] **`just install-hooks` copies the hook instead of symlinking it** (2026-09-09, noticed while
+  rewriting it). `.git/hooks/pre-commit` is a snapshot, so every edit to `.githooks/pre-commit` needs a
+  re-run of `just install-hooks` and nothing warns you that the installed copy is stale. Pre-existing,
+  not caused by the rewrite. A symlink would fix it but breaks on Windows checkouts without developer
+  mode; leave the copy unless staleness actually bites someone.
 - [-] **`jj resolve --tool :theirs <file>` resolves every conflicted hunk in the file, not just the one
   you are thinking about** (2026-09-09, learned during the cebarks/alexandria upstream sync). The sync
   plan's rules described one hunk per file ("take upstream's paragraph, append our sentence"), but
