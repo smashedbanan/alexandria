@@ -7,7 +7,7 @@ Alexandria loads server config with this precedence:
    - `ALEXANDRIA_CONFIG` env var (explicit path override)
    - `$XDG_CONFIG_HOME/alexandria/config.toml` (default: `~/.config/alexandria/config.toml` on Linux, `~/Library/Application Support/alexandria/config.toml` on macOS)
    - `~/.alexandria/config.toml` (legacy fallback, logged with a warning)
-3. **Individual env vars** — `ALEXANDRIA_DATA_DIR`, `ALEXANDRIA_EMBEDDING_MODEL`, `ALEXANDRIA_EMBEDDING_DEVICE`, `ALEXANDRIA_EMBEDDING_BATCH_SIZE`
+3. **Individual env vars** — `ALEXANDRIA_SERVER_TRANSPORT`, `ALEXANDRIA_SERVER_HOST`, `ALEXANDRIA_SERVER_PORT`, `ALEXANDRIA_DATA_DIR`, `ALEXANDRIA_EMBEDDING_MODEL`, `ALEXANDRIA_EMBEDDING_DEVICE`, `ALEXANDRIA_EMBEDDING_BATCH_SIZE`
 
 ## Full Example
 
@@ -24,7 +24,7 @@ sse_keep_alive_secs = 15      # SSE keep-alive interval in seconds (default: 15)
 # data_dir = "/home/you/.local/share/alexandria/data"  # Storage path; ":memory:" for ephemeral (default: $XDG_DATA_HOME/alexandria/data)
 
 [embedding]
-model = "sentence-transformers/all-MiniLM-L6-v2"   # HuggingFace model ID (no default — required)
+model = "sentence-transformers/all-MiniLM-L6-v2"   # HuggingFace model ID (default shown; omit to use it)
 device = "cpu"                                       # "cpu" only for now (default: "cpu")
 batch_size = 32                                      # Facts per embed() call in migrate-embeddings (default: 32)
 
@@ -121,20 +121,30 @@ Controls server-side filtering of `retrieve_memories` results.
 These env vars override individual config values after the TOML file is loaded:
 
 | Variable | Overrides |
-|---|---|
+| --- | --- |
 | `ALEXANDRIA_CONFIG` | Path to an alternate config TOML file |
+| `ALEXANDRIA_SERVER_TRANSPORT` | `server.transport` (`"stdio"` or `"http"`) |
+| `ALEXANDRIA_SERVER_HOST` | `server.host` |
+| `ALEXANDRIA_SERVER_PORT` | `server.port` — a non-numeric value fails startup with an error naming the variable |
 | `ALEXANDRIA_DATA_DIR` | `database.data_dir` |
 | `ALEXANDRIA_EMBEDDING_MODEL` | `embedding.model` |
 | `ALEXANDRIA_EMBEDDING_DEVICE` | `embedding.device` |
 | `ALEXANDRIA_EMBEDDING_BATCH_SIZE` | `embedding.batch_size` |
 
-Other config keys can only be set via the TOML file.
+The `ALEXANDRIA_SERVER_*` variables exist so a container can be configured entirely by environment
+(the bundled [Dockerfile](../Dockerfile) uses them to default to HTTP on `0.0.0.0:3000`) without
+shipping a config file.
+
+Everything else — `[heat]`, `[activation]`, `[cluster]`, `[retrieve]`, CORS, and SSE keep-alive —
+can only be set via the TOML file.
 
 ---
 
 ## Client Configuration
 
-The Pi auto-recall/store extension loads its own config from `$XDG_CONFIG_HOME/alexandria/client.toml`.
+The Pi auto-recall/auto-store extension loads its own config from `$XDG_CONFIG_HOME/alexandria/client.toml`.
+It is a separate file with separate keys — the server never reads it and the extension never reads
+`config.toml`.
 
 Precedence: defaults → `client.toml` → `ALEXANDRIA_CLIENT_CONFIG` env var (path to alt TOML) → individual `ALEXANDRIA_*` env vars.
 
