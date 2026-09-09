@@ -57,9 +57,14 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
   to choose. Rechecked 2026-09-09: 0.11.0 (2026-06-26) is still the newest candle-core release.
 - [-] **`tokenizers` is held at 0.22 to match candle-core 0.11** (2026-09-08; was 0.23, which built a
   second copy). Bump the workspace pin together with the next candle bump that moves its own.
-- [ ] **Transitive "Unchanged" `cargo update` entries are upstream pins, not ours.** `generic-array`
+- [-] **Transitive "Unchanged" `cargo update` entries are upstream pins, not ours.** `generic-array`
   0.14.7, `i_float`/`i_overlay`/`i_shape`, `matchit` 0.8.4, `pdqselect` 0.1.0 stay put even after
-  the direct bumps above; they move when the pulling crate (surrealdb stack) does.
+  the direct bumps above; they move when the pulling crate does. Rechecked 2026-09-09: `cargo update
+  --dry-run` locks 0 packages and every direct dependency is on its latest stable release. Holders:
+  `matchit` 0.8 by `axum` 0.8.9 (no axum 0.9 on crates.io yet; `matchit` 0.9 waits on it), the
+  `i_*` set by `geo` 0.32 via `revision` in surrealdb-core, `generic-array` 0.14 by `digest` 0.10
+  via `argon2` in surrealdb-core, `pdqselect` dev/build only. The next upstream moves that would
+  shift them are surrealdb 3.3 (3.3.0-beta.3 is prerelease, not adopted) and axum 0.9.
 
 ## Claude Code integration
 
