@@ -43,6 +43,27 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
   adopted; the escape hatch is a `#[allow(unsafe_code)]` on that one call plus
   `from_mmaped_safetensors`.
 
+- [ ] **`just lint` and `just check` still lack `--workspace`** (2026-09-09, companion to the `just test`
+  fix the same day). The root `Cargo.toml` is both a `[package]` and a `[workspace]`, so a bare
+  `cargo <cmd>` there defaults to the root package alone, not the members — `just test` was silently
+  running 27 of 145 tests until `--workspace` was added. `lint` (`cargo clippy --all-targets
+  --all-features`) and `check` have the identical shape and so cover only the root crate today.
+  Verified safe to fix: `cargo clippy --workspace --all-targets -- -D warnings` is clean on the tree
+  as of 2026-09-09, so adding `--workspace` to both surfaces no new failures. Left out of the
+  `just test` change only to keep that diff to the one recipe.
+- [-] **`jj resolve --tool :theirs <file>` resolves every conflicted hunk in the file, not just the one
+  you are thinking about** (2026-09-09, learned during the cebarks/alexandria upstream sync). The sync
+  plan's rules described one hunk per file ("take upstream's paragraph, append our sentence"), but
+  `README.md` and `docs/configuration.md` each had several, so blanket `:theirs` silently deleted
+  fork-only content upstream had no counterpart for — the journald size-cap section,
+  `RUST_LOG=info,rmcp=warn`, the whole Claude Code MCP-client block, `contrib/claude` cross-references,
+  every `batch_size` doc, the `min_similarity = 0.10` floor, the "Switching models" paragraph, the
+  `1_Pooling/config.json` clause, and the `alexandria migrate-embeddings` command name. Two restoration
+  rounds recovered them. Before accepting any future `:theirs`/`:ours` resolve, diff each file's
+  base→ours additions against the result and require a three-way grep count (ours/upstream/current);
+  an upstream count of 0 means upstream never had the content, so it cannot have superseded anything
+  and the loss is silent, not a merge decision.
+
 ## Dependencies
 
 - [-] **`tokenizers` still builds `onig`** (2026-09-08). candle-core 0.11 depends on tokenizers with
