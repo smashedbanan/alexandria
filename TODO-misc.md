@@ -127,12 +127,17 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
   file edited while a detached copy is mid-run leaves stale noise there (today: three "LLM call 2
   failed" lines and a line-118 syntax error from a half-written edit, none reproducible by the
   committed script). Truncated by hand 2026-09-08. Rotate only if it ever grows past a few KB.
-- [ ] **Extraction dedups within a session only, so the same gotcha is stored once per session that hits
-  it** (2026-09-08). The `<already_stored>` block in `alexandria-extract.sh` is `get_session` for the
-  current session; auto-recall on 2026-09-08 returned three `extracted` memories from three sessions all
-  saying "hook development in a live session pollutes the database". Cheapest fix: before storing, run
-  `retrieve_memories` on each candidate and skip above some similarity; or feed the top recall hits for the
-  turn into `<already_stored>` alongside the session list. Needs a threshold measurement first.
+- [-] **Cross-session extraction dedup covers only what the prompts recalled** (2026-09-08, replaces
+  the "dedups within a session only" item). `alexandria-extract.sh` now adds the recall hook's hits, read
+  from the `hook_additional_context` attachment lines in the transcript chunk, to `<already_stored>`.
+  Measured first: a post-hoc similarity filter on the candidates does not work on MiniLM, since the
+  three real duplicates scored 0.64-0.76 against each other and distinct neighbours 0.63-0.76, so
+  haiku has to judge. Not covered: a gotcha that surfaces only from tool output (nothing recalled it);
+  sessions with `ALEXANDRIA_AUTO_RECALL=off`; and hits recalled for prompts in an earlier chunk of the
+  same session, since only the lines past the marker are scanned (scanning the whole transcript is one
+  `tail` argument away but would grow the block without bound on long sessions). If duplicates of that
+  shape keep appearing, the next step is one `retrieve_memories` per candidate with the top hits fed to
+  a second, smaller haiku call.
 - [-] **`shellcheck contrib/claude/hooks/*.sh` exits 1 on an info-level false positive** (2026-09-08,
   pre-existing). SC2016 on the `sed -n '/^```/,/^```/...'` fence-stripping line in `alexandria-extract.sh`:
   the backticks are a regex, not an unexpanded command substitution. Everything else is clean. Add a
