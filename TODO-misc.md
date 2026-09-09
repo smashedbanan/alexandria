@@ -108,16 +108,29 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
 - [ ] **Retry doubles cost on tactical turns.** Every turn where haiku correctly finds nothing now pays a
   second call (up to ~80 s wall, hidden by async). Watch the `extracted` volume; if it is mostly
   noise or the cost matters, drop the retry or gate it on transcript size.
-- [ ] **Headless experiments write to the live server.** Any `claude -p` run on this machine fires the
+- [ ] Done 2026-09-08: **Headless experiments write to the live server.** Any `claude -p` run on this machine fires the
   installed hooks, so a stub extractor's output (or haiku's) lands in the real database under a
   throwaway session id; 2026-09-08 testing left six `stub` memories that had to be deleted by hand.
-  Prefix experiments with `ALEXANDRIA_AUTO_STORE=off` or point `ALEXANDRIA_URL` at a scratch server.
-- [ ] **Hook development in a live interactive session pollutes the real database.** Companion to the
+  Fixed: `claude -p` sets `CLAUDE_CODE_ENTRYPOINT=sdk-cli` (interactive is `cli`), so both store
+  paths (detectors in `alexandria-recall.sh`, extraction in `alexandria-extract.sh`) now default
+  auto-store off when the entrypoint matches `sdk-*`; `ALEXANDRIA_AUTO_STORE=on` opts back in.
+  Recall and session-id injection stay on. Verified with a real `claude -p 'always use tabs ...'`
+  run: no session created, no marker files.
+- [ ] **`CLAUDE_CODE_ENTRYPOINT` is undocumented** (2026-09-08). The headless guard above keys on an
+  internal env var observed on Claude Code 2.1.263 (`cli` interactive, `sdk-cli` for `claude -p`).
+  The `sdk-*` glob is meant to also cover Agent SDK harnesses, but those values are assumed, not
+  observed: third-party harnesses and the Agent SDK run on API billing only, and the subscription
+  plan cannot drive them, so they cannot be checked from this machine. If a release renames the
+  variable the hooks silently fall back to the old always-on behaviour; re-run the `claude -p`
+  check above after Claude Code upgrades.
+- [-] **Hook development in a live interactive session pollutes the real database.** Companion to the
   headless item above: the installed Stop hook extracts from this session's transcript too, so stub
   payloads and probe strings from tests pasted into the conversation become `extracted` memories (a
   "Detach debug probe" memory from 2026-09-08 surfaced in auto-recall today). `test.sh` itself is
-  clean (own session id, deletes on exit); the leak is the interactive session around it. Mitigation
-  is the same: `ALEXANDRIA_AUTO_STORE=off` in the developing session's env, or delete by hand.
+  clean (own session id, deletes on exit); the leak is the interactive session around it. Parked
+  2026-09-08: nothing in the hook can tell a pasted stub payload from a real conversation, so the
+  headless fix does not apply. Accepted mitigation: start the developing session with
+  `ALEXANDRIA_AUTO_STORE=off`, or delete by hand afterwards.
 - [ ] **A queued follow-up prompt lands in the previous turn's chunk.** If the user types the next
   prompt while a turn is still generating, Claude Code dispatches it as soon as the turn ends, inside
   the 1 s flush wait, so the extract hook sees it with the previous turn. Harmless (it is extracted
