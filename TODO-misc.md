@@ -59,7 +59,9 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
   Fourth point added 2026-09-09 by the threshold-sweep run: 807 facts, `mean_rank` 2.83, one
   per-question rank change against the 743 row. That bounds short-term jitter as far smaller than
   the 143 -> 743 move, but 64 facts is not the "next significant corpus size" this item is asking
-  for — it does not narrow the shape of the curve.
+  for — it does not narrow the shape of the curve. Fifth point 2026-09-09 while verifying the
+  `scored == 0` guard: 830 facts, `mean_rank` still 2.83, `top1` still 7/12, `hit_min` 0.338 —
+  unchanged from the 807 row, same caveat, still not the corpus jump this item wants.
 - [ ] **The question set only targets facts from the original 143.** All 12 targets predate
   2026-09-08 16:26 UTC, so the 590 facts added since are never a correct answer, only distractors.
   That makes the third pass a clean measurement of "fixed questions against a growing haystack",
@@ -79,17 +81,21 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
   headline numbers are repeated in the pointer left at the end of
   `docs/plans/2026-09-08-embedding-model-swap-measurements.md`, so a future rerun has two places to
   update and only one of them is the maintained doc.
-- [ ] **`docs/configuration.md` now recommends `bench-retrieval` to anyone switching models, but
-  the tool only works on this corpus** (2026-09-09, introduced by that same edit). The "Switching
+- [x] Done 2026-09-09: **`docs/configuration.md` now recommends `bench-retrieval` to anyone
+  switching models, but the tool only works on this corpus** (2026-09-09, introduced by that same edit). The "Switching
   models on an existing database" paragraph now says `alexandria bench-retrieval` derives
   `[retrieve] min_similarity` and `[recall] min_similarity` from the new model's output. True here,
   false everywhere else: `QUESTIONS` in `src/bench.rs` hardcodes twelve `fact:` record IDs from this
   install, so on any other database every target is absent. `compute()` skips absent targets by
   design, so the run does not fail — it prints `0/12 questions scored` above a row of `NaN` and `inf`,
   and the floor rule's sanity check compares against an infinite `hit_min`. The `0/12` is a clear
-  enough signal to a reader who looks, but the advice in the config doc does not warn them. Either
-  qualify that paragraph as install-specific, or make `run()` bail when `scored == 0` with a message
-  naming the cause. The second is three lines and makes the doc honest without a caveat.
+  enough signal to a reader who looks, but the advice in the config doc does not warn them. Took the
+  second option: `run()` now bails with `anyhow::ensure!(live_metrics.scored > 0, ...)` before any
+  output, so an install without the frozen targets gets an error naming QUESTIONS and the frozen-set
+  cause instead of a NaN table and a `floor < inf` sanity check. Exits 1. `docs/configuration.md:78`
+  left as written, per the option chosen. Verified both ways against a copy of the live data dir:
+  12/12 unchanged on the real corpus, and the guard fires with the target IDs temporarily rewritten
+  to absent ones.
 - [-] **Prose in `src/config.rs` doc comments duplicates `docs/configuration.md` and nothing checks
   them** (2026-09-09, found while closing the floor-rule item). That item named
   `docs/configuration.md:117` as the one place claiming "the rule gives 0.08 for MiniLM"; the same
@@ -99,6 +105,22 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
   mitigation applies: when a doc comment and the config reference would both carry a measured number,
   put it in one and point at it from the other. Grep `src/config.rs` for the value before closing any
   future "stale number in configuration.md" item.
+- [-] **The `scored == 0` bail guards the live pass only** (2026-09-09, added with that guard). The
+  baseline pass is the oldest `BASELINE_SIZE` of the live corpus, so a live corpus that scores at all
+  normally carries the targets into the baseline window too, and a live corpus that scores zero never
+  reaches the baseline report. The uncovered case needs a database holding those exact record IDs
+  where all twelve are outside the oldest 143 — not reachable from any real corpus this tool runs on.
+  Guard the baseline separately only if `BASELINE_SIZE` ever stops meaning "the original install".
+
+- [-] **The `bench-retrieval` corpus copy was taken from a live data dir** (2026-09-09). `README.md:55-57`
+  says to stop the server for the `cp` and then run against the copy via `ALEXANDRIA_DATA_DIR`; the
+  `scored == 0` verification skipped the stop and copied `~/.local/share/alexandria/data` while the
+  server held the writer lock. SurrealKV replayed the WAL and reported 830 facts, and the metrics row
+  matched the previous run, so nothing detectably tore — but an LSM tree copied mid-write is not
+  guaranteed consistent, and a silently truncated copy would look like a corpus-size data point rather
+  than an error. Treat the 830 figure as approximate. Stop the server for any copy whose numbers get
+  recorded in `docs/minilm-test-data.md`.
+
 - [-] **The baseline pass reconstructs by size, not identity** (2026-09-09). `BASELINE_SIZE = 143`
   takes the 143 oldest active facts, which is not the same set as the 143 that were active on
   2026-09-08: any of those deleted since drops out and the window reaches forward to replace it. It
