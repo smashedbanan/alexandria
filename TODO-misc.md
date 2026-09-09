@@ -12,23 +12,17 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
 
 ### Embedding migration follow-ups (deferred from the 2026-09-08 branch review)
 
-- [ ] **The "v0.2" in the startup log lines is hand-written and disagrees with `Cargo.toml`**
-  (2026-09-09, noticed while closing the entry above). Both `tracing::info!` lines in `src/main.rs`
-  say `v0.2` while the workspace `version` is `0.1.0`. Either bump `Cargo.toml` or switch the two
-  strings to `env!("CARGO_PKG_VERSION")`; decide which is the source of truth first.
 - [-] **The rewritten floor rule has only been applied on paper** (2026-09-08). `nonhit_p50` and the
   `< hit_min` check were read off the existing measurements tables; no script computes them. The bench
   tooling is not in the tree: the candle bench example was deleted with the first pass and the second
   pass ran through a throwaway sentence-transformers script in `/tmp/alexandria-bench`, recipe recorded
   in the measurements doc. Accepted as-is 2026-09-09: the model question is closed, so no bench is
   planned. If one is ever rerun, derive the floor from its own output and confirm the table.
-- [ ] **`config.rs` and `docs/configuration.md` describe `min_similarity` as 0.10 with no pointer to the
-  derivation rule** (2026-09-08). The rule gives 0.08 for MiniLM; 0.10 was kept as-is because the
-  incumbent won and the difference is immaterial. Add one sentence to the `config.rs` doc comment and
-  the `docs/configuration.md:117` row citing the rule in the design plan, instead of only restating
-  measured ranges. Same pass: `src/config.rs:166` defaults `min_similarity` to 0.10 while
-  `crates/alexandria-mcp/src/server.rs:50` defaults it to 0.30 — the builder default is undocumented
-  and diverges from the config default.
+- [-] **The `AlexandriaServer` builder default for `retrieve_min_similarity` is kept equal to
+  `RetrieveConfig` by hand** (2026-09-09, both 0.10). No test asserts they match: the config type lives
+  in the binary crate and the builder in `alexandria-mcp`, and `main.rs` always overrides the builder
+  from config, so the builder value only reaches tests. Add an assertion in `src/config.rs` tests if it
+  ever drifts again.
 - [-] **`CandleProvider::set_cls_pooling` is public API that exists only for one test** (2026-09-09).
   Integration tests cannot see `cfg(test)` items, so the hook is `pub` behind `#[doc(hidden)]`. A cargo
   feature gate (`test-util`, self dev-dependency) would hide it properly; add one if a second such hook

@@ -1,6 +1,6 @@
 [package]
 name = "alexandria"
-version = "0.1.0"
+version.workspace = true
 edition.workspace = true
 license.workspace = true
 
@@ -14,6 +14,7 @@ members = [
 ]
 
 [workspace.package]
+version = "0.2.0"
 edition = "2024"
 rust-version = "1.98"
 license = "AGPL-3.0-or-later"
