@@ -18,7 +18,7 @@ Agent memory server with tiered maturity, hierarchical clustering, spreading act
 
 ```bash
 # Build and install
-cargo install --path crates/alexandria
+cargo install --path .
 
 # Create config
 mkdir -p ~/.config/alexandria

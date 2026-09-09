@@ -12,13 +12,6 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
 
 ## Server
 
-- [x] Done 2026-09-08: **Claude Code hooks stamp `agent_id: "claude-code"`.** `alexandria-session.sh` now
-  fills `agent_id` as well as `session_id` on `store_memory` / `import_document` calls that lack either
-  (a value the model set is kept); the detector stores in `alexandria-recall.sh` and the extraction stores
-  in `alexandria-extract.sh` send it directly. `SessionRepo::find_or_create` fills a still-empty field on
-  an existing session, so every Claude Code session row gets stamped by its first store from any of the
-  three. Still parked: `model` (not in the hook payload) and the Pi extension, which sends only
-  `session_id`; add when a session view wants to tell those apart.
 - [-] **`raw` record carries no session.** The 2026-09-08 `import_document` session linkage attaches
   the chunks only; the `raw` document record is reachable from them via `extracted_from` but has no
   session edge of its own. Parked 2026-09-08: `contains_session_memory` is declared `IN session OUT fact`,
@@ -27,11 +20,6 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
 
 ### Embedding migration follow-ups (deferred from the 2026-09-08 branch review)
 
-- [x] Done 2026-09-08: **`embedding.batch_size = 0` is rejected at config load.** The `ensure!` moved
-  from `reembed()` into `Config::load_from`, after the env overrides, so a bad TOML value or
-  `ALEXANDRIA_EMBEDDING_BATCH_SIZE=0` refuses to boot instead of failing only under `migrate-embeddings`.
-  `reembed()` no longer guards the value itself (`chunks(0)` would panic), so any future caller other
-  than `main` has to pass a loaded config value; the `reembed_rejects_zero_batch_size` test went with it.
 - [-] **`migrate-embeddings` no longer logs "Alexandria v0.2 starting..."** (2026-09-08, side effect of
   ed923ee): the subcommand returns from inside the argument match, before the startup log line. It
   still logs its own progress. Accepted; add a line at the top of `migrate_embeddings()` if it matters.
@@ -70,10 +58,10 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
   adopted; the escape hatch is a `#[allow(unsafe_code)]` on that one call plus
   `from_mmaped_safetensors`.
 
-- [x] Done 2026-09-09: **The installed service predates the `batch_size` boot check.** Rebuilt with
-  `cargo install --path crates/alexandria` from 255dde7 and restarted the user unit; the installed binary
-  now refuses `ALEXANDRIA_EMBEDDING_BATCH_SIZE=0` with "embedding.batch_size must be at least 1" before
-  opening the database.
+- [-] **The binary crate moved from `crates/alexandria` to the workspace root** (2026-09-09), so
+  `cargo install --path .` works instead of needing `--path crates/alexandria`. `docs/plans/2026-09-08-embedding-model-swap-design.md`
+  and `-implementation.md` still cite the old `crates/alexandria/...` paths and the old install command;
+  left alone as historical plans, same as the other stale-doc entries above.
 
 ## Dependencies
 
@@ -116,11 +104,6 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
   tag. Add the filter if junk memories of that shape ever appear; add attribution if haiku's output
   turns out to need it. Error text counts toward `ALEXANDRIA_EXTRACT_MIN_CHARS`, so error-heavy
   sessions extract a turn earlier.
-- [x] Done 2026-09-08: **All three hooks read stdin before any guard.** `alexandria-recall.sh` and
-  `alexandria-session.sh` now match `alexandria-extract.sh`; the recall hook skips the read in debug CLI
-  mode (`$# -gt 0`) so a one-shot tool call from a terminal does not block. The `hook()` helper in
-  `test.sh` was already a bare `jq | hook` pipeline under `set -eo pipefail`, so the SIGPIPE hazard the
-  parked entry described was live there too.
 - [-] **Stop-hook extraction makes one haiku call per turn** (2026-09-08, retry dropped). The retry on an
   empty first result rested on one observation (empty, then three memories on the same prompt) and
   doubled the cost of every tactical turn; the extract log showed only the second call failing, on
@@ -139,17 +122,6 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
   2026-09-08: nothing in the hook can tell a pasted stub payload from a real conversation, so the
   headless fix does not apply. Accepted mitigation: start the developing session with
   `ALEXANDRIA_AUTO_STORE=off`, or delete by hand afterwards.
-- [x] Done 2026-09-09: **`extract.log` lives in `$XDG_STATE_HOME/alexandria/` and is rotated by size.** The
-  parent hook renames it to `extract.log.1` once it passes 1 MiB, before each detached re-exec; one
-  generation kept. Moved twice the same day: `$XDG_RUNTIME_DIR` (append-only, wiped at logout) to
-  `~/.cargo/logs/alexandria/`, then to the XDG state dir, which is where logs conventionally go.
-
-- [x] Done 2026-09-09: **Per-session marker files moved to `$XDG_STATE_HOME/alexandria/` and pruned.**
-  `<session_id>.extracted` and `<session_id>.stored` sit next to `extract.log`; the extract hook's parent
-  path deletes any idle for over 7 days (`find -mtime +7`), right after the log rotation. They now survive
-  logout, so a resumed session never re-extracts from line 0; one resumed after 7 idle days re-extracts
-  once with dedup and may re-store a detector hit. Was `$XDG_RUNTIME_DIR/alexandria/`, 120+ files a day,
-  wiped with the tmpfs.
 - [-] **Marker pruning is a fixed 7 days and runs only from the Stop hook** (2026-09-09). The window is a
   literal in `alexandria-extract.sh`'s `find -mtime +7`; `.stored` markers from the recall hook are only
   pruned when a Stop hook fires on the same machine. Both fine as long as one Claude Code install is in
@@ -169,9 +141,6 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
   `tail` argument away but would grow the block without bound on long sessions). If duplicates of that
   shape keep appearing, the next step is one `retrieve_memories` per candidate with the top hits fed to
   a second, smaller haiku call.
-- [x] Done 2026-09-08: **`shellcheck contrib/claude/hooks/*.sh` exits 0.** A `# shellcheck disable=SC2016`
-  on the fence-stripping `sed` line in `alexandria-extract.sh`; the backticks there are a regex, not an
-  unexpanded command substitution.
 - [ ] **A queued follow-up prompt lands in the previous turn's chunk.** If the user types the next
   prompt while a turn is still generating, Claude Code dispatches it as soon as the turn ends, inside
   the 1 s flush wait, so the extract hook sees it with the previous turn. Harmless (it is extracted
