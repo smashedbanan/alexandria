@@ -2,14 +2,6 @@
 
 Open items noticed while getting Alexandria running under Claude Code (2026-09-08).
 
-## Retrieval quality
-
-- [-] **Model bench tooling is not in the tree** (2026-09-08). The candle bench example was deleted with
-  the first pass and the second pass ran through a throwaway sentence-transformers script in
-  `/tmp/alexandria-bench` (`uv run` with inline metadata pinning torch to the pytorch CPU index; corpus
-  dumped to JSON by a one-off `MemoryRepo::list` example). Recipe is recorded in the measurements doc.
-  Parked: the model question is closed, so nothing to keep.
-
 ## Server
 
 - [-] **`raw` record carries no session.** The 2026-09-08 `import_document` session linkage attaches
@@ -20,17 +12,23 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
 
 ### Embedding migration follow-ups (deferred from the 2026-09-08 branch review)
 
-- [-] **`migrate-embeddings` no longer logs "Alexandria v0.2 starting..."** (2026-09-08, side effect of
-  ed923ee): the subcommand returns from inside the argument match, before the startup log line. It
-  still logs its own progress. Accepted; add a line at the top of `migrate_embeddings()` if it matters.
+- [ ] **The "v0.2" in the startup log lines is hand-written and disagrees with `Cargo.toml`**
+  (2026-09-09, noticed while closing the entry above). Both `tracing::info!` lines in `src/main.rs`
+  say `v0.2` while the workspace `version` is `0.1.0`. Either bump `Cargo.toml` or switch the two
+  strings to `env!("CARGO_PKG_VERSION")`; decide which is the source of truth first.
 - [-] **The rewritten floor rule has only been applied on paper** (2026-09-08). `nonhit_p50` and the
-  `< hit_min` check were read off the existing measurements tables; no script computes them, since the
-  bench tooling is not in the tree (see the parked entry under Retrieval quality). The next bench
-  should derive the value from its own output and confirm the table above.
-- [-] **`config.rs` and `docs/configuration.md` describe `min_similarity` as 0.10 with no pointer to the
+  `< hit_min` check were read off the existing measurements tables; no script computes them. The bench
+  tooling is not in the tree: the candle bench example was deleted with the first pass and the second
+  pass ran through a throwaway sentence-transformers script in `/tmp/alexandria-bench`, recipe recorded
+  in the measurements doc. Accepted as-is 2026-09-09: the model question is closed, so no bench is
+  planned. If one is ever rerun, derive the floor from its own output and confirm the table.
+- [ ] **`config.rs` and `docs/configuration.md` describe `min_similarity` as 0.10 with no pointer to the
   derivation rule** (2026-09-08). The rule gives 0.08 for MiniLM; 0.10 was kept as-is because the
-  incumbent won and the difference is immaterial. If a model swap ever lands, the doc comment and the
-  configuration table should cite the rule in the design plan rather than restating measured ranges.
+  incumbent won and the difference is immaterial. Add one sentence to the `config.rs` doc comment and
+  the `docs/configuration.md:117` row citing the rule in the design plan, instead of only restating
+  measured ranges. Same pass: `src/config.rs:166` defaults `min_similarity` to 0.10 while
+  `crates/alexandria-mcp/src/server.rs:50` defaults it to 0.30 — the builder default is undocumented
+  and diverges from the config default.
 - [-] **`CandleProvider::set_cls_pooling` is public API that exists only for one test** (2026-09-09).
   Integration tests cannot see `cfg(test)` items, so the hook is `pub` behind `#[doc(hidden)]`. A cargo
   feature gate (`test-util`, self dev-dependency) would hide it properly; add one if a second such hook
@@ -57,34 +55,12 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
   adopted; the escape hatch is a `#[allow(unsafe_code)]` on that one call plus
   `from_mmaped_safetensors`.
 
-- [-] **The binary crate moved from `crates/alexandria` to the workspace root** (2026-09-09), so
-  `cargo install --path .` works instead of needing `--path crates/alexandria`. `docs/plans/2026-09-08-embedding-model-swap-design.md`
-  and `-implementation.md` still cite the old `crates/alexandria/...` paths and the old install command;
-  left alone as historical plans, same as the other stale-doc entries above.
-
 ## Dependencies
 
-- [-] **Cache-first model loading never refreshes a cached revision** (2026-09-08). Once `refs/main`
-  is on disk it is served forever; delete `~/.cache/huggingface/hub/models--<owner>--<name>` to
-  re-fetch. Accepted as-is.
-- [-] **`hub.rs` shortcuts** (2026-09-08, all marked `ponytail:` in the file). Files go straight into
-  `snapshots/<sha>/` with no `blobs/` symlink, no `.no_exist` marker, no lock files, no `HF_TOKEN`,
-  no `HF_ENDPOINT`; only revision `main`. Consequences: a model that lacks `1_Pooling/config.json`
-  pays one 404 per online boot and falls to the warn-and-assume-mean path offline (every
-  sentence-transformers repo ships the file, so this never fires today); two servers first-booting
-  on the same empty cache both download (rename-into-place keeps the result correct); gated or
-  private models cannot be fetched. Add whichever one actually bites.
-- [-] **Every dependency is `default-features = false` with features listed explicitly** (2026-09-08).
-  surrealdb carries only `kv-mem` and `kv-surrealkv`; `protocol-ws` and `rustls` must be re-added
-  (comment in the root `Cargo.toml`) if SurrealDB is ever not on localhost. Runtime-only defaults
-  dropped on purpose: tokio `full` (six named features instead), tracing-subscriber `smallvec`, axum
-  `tracing`/`tower-log`, tokenizers `progressbar`/`esaxx_fast`, base64 `simd-unsafe`, chrono
-  `oldtime`/`wasmbind`, toml `display`. Kept on purpose: tracing-subscriber `ansi` and `tracing-log`,
-  since dropping either changes log output without failing any test.
 - [-] **`tokenizers` still builds `onig`** (2026-09-08). candle-core 0.11 depends on tokenizers with
   the `onig` feature itself, so our `default-features = false` cannot drop the C build. Goes away
   only if a candle bump drops it; `fancy-regex` is the pure-Rust alternative if it ever becomes ours
-  to choose.
+  to choose. Rechecked 2026-09-09: 0.11.0 (2026-06-26) is still the newest candle-core release.
 - [-] **`tokenizers` is held at 0.22 to match candle-core 0.11** (2026-09-08; was 0.23, which built a
   second copy). Bump the workspace pin together with the next candle bump that moves its own.
 - [ ] **Transitive "Unchanged" `cargo update` entries are upstream pins, not ours.** `generic-array`
@@ -93,26 +69,26 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
 
 ## Claude Code integration
 
-- [-] **Extraction sees failed tool results, but not which tool or whether the retry worked** (2026-09-08,
-  replaces the "port the Pi error-resolution tracker" item). `alexandria-extract.sh` now serializes
-  `is_error` tool results as `[Tool error]: <first 300 chars>` next to the user/assistant text, minus
-  `<tool_use_error>` harness refusals, and leaves pairing and root-cause judgement to haiku. Accepted
-  noise: permission denials, worktree-isolation refusals, and user rejections still go in (each is a
-  one-liner; the prompt already excludes common knowledge). Not done: tool-name attribution, which
-  needs the `tool_use_id` joined back to the previous assistant line, and the Pi `error-resolution`
-  tag. Add the filter if junk memories of that shape ever appear; add attribution if haiku's output
-  turns out to need it. Error text counts toward `ALEXANDRIA_EXTRACT_MIN_CHARS`, so error-heavy
-  sessions extract a turn earlier.
+- [-] **Extraction keeps the Pi `error-resolution` tag unimplemented** (2026-09-09, remainder of the
+  tool-error entry closed the same day). `alexandria-extract.sh` serializes `is_error` tool results as
+  `[Tool error]: <tool> <first 120 chars of its input> -- <first 300 chars>`, joined through
+  `tool_use_id` (a result whose call is not in the chunk keeps the bare form), and leaves pairing
+  and root-cause judgement to haiku. Accepted noise: permission denials, worktree-isolation refusals,
+  and user rejections still go in. Add the tag filter only if junk memories of that shape appear.
+- [ ] **Tool input in `[Tool error]` lines is cut at 120 characters of raw JSON** (2026-09-09), so a
+  long Bash command truncates mid-string and the `description` field is usually lost. Readable enough
+  for haiku today; the fix is `input.command // input.file_path` per tool. Do it or accept it for good
+  and drop this entry.
 - [-] **Stop-hook extraction makes one haiku call per turn** (2026-09-08, retry dropped). The retry on an
   empty first result rested on one observation (empty, then three memories on the same prompt) and
   doubled the cost of every tactical turn; the extract log showed only the second call failing, on
   the shrunken timeout. If `extracted` volume drops noticeably, restore the loop gated on transcript
   size rather than unconditionally.
-- [-] **The `sdk-*` gate does not cover other non-interactive entrypoints** (2026-09-08). The 2.1.263 binary
+- [ ] **The `sdk-*` gate does not cover other non-interactive entrypoints** (2026-09-08). The 2.1.263 binary
   also knows `claude-code-github-action`, `local-agent`, `remote`, `remote_cowork`, `remote_baku`, and
   `bench`, none of which match `sdk-*`, so auto-store stays on there. Nothing here runs in those surfaces
-  yet. Widen the `case` in `alexandria-recall.sh` / `alexandria-extract.sh` if one is ever used with these
-  hooks installed.
+  yet, but widening the `case` is one line each in `alexandria-recall.sh:108` and
+  `alexandria-extract.sh:27`.
 - [-] **Hook development in a live interactive session pollutes the real database.** Companion to the
   `CLAUDE_CODE_ENTRYPOINT` item: the installed Stop hook extracts from this session's transcript too, so stub
   payloads and probe strings from tests pasted into the conversation become `extracted` memories (a
@@ -121,13 +97,9 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
   2026-09-08: nothing in the hook can tell a pasted stub payload from a real conversation, so the
   headless fix does not apply. Accepted mitigation: start the developing session with
   `ALEXANDRIA_AUTO_STORE=off`, or delete by hand afterwards.
-- [-] **Marker pruning runs only from the Stop hook** (2026-09-09). `.stored` markers from the recall hook
+- [ ] **Marker pruning runs only from the Stop hook** (2026-09-09). `.stored` markers from the recall hook
   are only pruned when a Stop hook fires on the same machine. Fine as long as one Claude Code install is
-  in play; add the same `find` to `alexandria-recall.sh` if a recall-only install ever accumulates them.
-- [-] **A stray `extract.log` from the first location is still in `$XDG_RUNTIME_DIR/alexandria/`**
-  (2026-09-09). Predates both moves, nothing writes it, and the tmpfs clears it at logout. Left alone.
-  `docs/plans/2026-09-08-todo-misc-plan.md` also still names the runtime-dir paths; it is a historical
-  plan and was not updated.
+  in play; the fix is copying the `find` from `alexandria-extract.sh:45` into `alexandria-recall.sh`.
 - [-] **Cross-session extraction dedup covers only what the prompts recalled** (2026-09-08, replaces
   the "dedups within a session only" item). `alexandria-extract.sh` now adds the recall hook's hits, read
   from the `hook_additional_context` attachment lines in the transcript chunk, to `<already_stored>`.
