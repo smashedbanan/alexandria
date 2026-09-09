@@ -218,7 +218,13 @@ impl AlexandriaServer {
         // 6. Session linkage (implicit create on first use)
         if let Some(ref session_id) = params.session_id {
             let session_repo = SessionRepo::new(self.db.inner());
-            let session_rid = session_repo.find_or_create(session_id).await?;
+            let session_rid = session_repo
+                .find_or_create(
+                    session_id,
+                    params.agent_id.as_deref(),
+                    params.model.as_deref(),
+                )
+                .await?;
             session_repo.add_memory(&session_rid, &fact_id).await?;
             session_repo.touch(session_id).await?;
         }
@@ -342,7 +348,15 @@ impl AlexandriaServer {
         // Session linkage (implicit create on first use), resolved once for all chunks
         let session_repo = SessionRepo::new(self.db.inner());
         let session_rid = match params.session_id {
-            Some(ref session_id) => Some(session_repo.find_or_create(session_id).await?),
+            Some(ref session_id) => Some(
+                session_repo
+                    .find_or_create(
+                        session_id,
+                        params.agent_id.as_deref(),
+                        params.model.as_deref(),
+                    )
+                    .await?,
+            ),
             None => None,
         };
 
@@ -827,6 +841,8 @@ mod get_info_tests {
                 content: "a near match memory".to_string(),
                 tags: None,
                 session_id: None,
+                agent_id: None,
+                model: None,
             })
             .await
             .unwrap();
@@ -835,6 +851,8 @@ mod get_info_tests {
                 content: "a far away memory".to_string(),
                 tags: None,
                 session_id: None,
+                agent_id: None,
+                model: None,
             })
             .await
             .unwrap();
@@ -902,6 +920,8 @@ mod get_info_tests {
                 content: "just below the floor".to_string(),
                 tags: None,
                 session_id: None,
+                agent_id: None,
+                model: None,
             })
             .await
             .unwrap();
@@ -910,6 +930,8 @@ mod get_info_tests {
                 content: "just above the floor".to_string(),
                 tags: None,
                 session_id: None,
+                agent_id: None,
+                model: None,
             })
             .await
             .unwrap();
@@ -946,6 +968,8 @@ mod get_info_tests {
                 content: "kept fact".to_string(),
                 tags: None,
                 session_id: Some("sess-del".to_string()),
+                agent_id: None,
+                model: None,
             })
             .await
             .unwrap();
@@ -954,6 +978,8 @@ mod get_info_tests {
                 content: "deleted fact".to_string(),
                 tags: None,
                 session_id: Some("sess-del".to_string()),
+                agent_id: None,
+                model: None,
             })
             .await
             .unwrap();
@@ -999,6 +1025,8 @@ mod get_info_tests {
                 content: "unrelated fact outside the session".to_string(),
                 tags: None,
                 session_id: None,
+                agent_id: None,
+                model: None,
             })
             .await
             .unwrap();
@@ -1009,6 +1037,8 @@ mod get_info_tests {
                 chunk_strategy: Some("paragraph".to_string()),
                 tags: None,
                 session_id: Some("sess-import".to_string()),
+                agent_id: None,
+                model: None,
             })
             .await
             .unwrap();
@@ -1047,6 +1077,8 @@ mod get_info_tests {
                 content: "first session fact".to_string(),
                 tags: None,
                 session_id: Some("sess-abc".to_string()),
+                agent_id: None,
+                model: None,
             })
             .await
             .unwrap();
@@ -1055,6 +1087,8 @@ mod get_info_tests {
                 content: "second session fact".to_string(),
                 tags: Some(vec!["important".to_string()]),
                 session_id: Some("sess-abc".to_string()),
+                agent_id: Some("claude-code".to_string()),
+                model: Some("claude-sonnet-5".to_string()),
             })
             .await
             .unwrap();
@@ -1065,6 +1099,8 @@ mod get_info_tests {
                 content: "unrelated fact".to_string(),
                 tags: None,
                 session_id: None,
+                agent_id: None,
+                model: None,
             })
             .await
             .unwrap();
@@ -1095,6 +1131,9 @@ mod get_info_tests {
         let parsed: serde_json::Value = serde_json::from_str(&session_json).unwrap();
         assert_eq!(parsed["session"]["external_id"], "sess-abc");
         assert_eq!(parsed["session"]["memory_count"], 2);
+        // Acquired from the second store_memory; the session was created without them.
+        assert_eq!(parsed["session"]["agent_id"], "claude-code");
+        assert_eq!(parsed["session"]["model"], "claude-sonnet-5");
         assert!(parsed["session"]["summary"].is_null());
         assert_eq!(parsed["memories"].as_array().unwrap().len(), 2);
 
@@ -1145,6 +1184,8 @@ mod get_info_tests {
                 content: "a near match memory".to_string(),
                 tags: None,
                 session_id: None,
+                agent_id: None,
+                model: None,
             })
             .await
             .unwrap();

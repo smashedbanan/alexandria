@@ -12,12 +12,14 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
 
 ## Server
 
-- [-] **Implicitly created sessions have no `agent_id` or `model`.** `SessionRepo::find_or_create`
-  (2026-09-08, replaced the duplicated block in `do_store_memory` / `do_import_document`) creates with
-  both `None`, and `finalize_session` only sets summary and tags, so a session first seen via
-  `store_memory` can never acquire them. Same as before the refactor; nothing reads the fields yet.
-  Add optional `agent_id`/`model` params to `store_memory` and thread them through if a session view
-  ever wants them.
+- [-] **No caller passes `agent_id` / `model` to `store_memory` yet** (2026-09-08, follow-up to the
+  optional params added that day). `SessionRepo::find_or_create` now takes both, sets them on create,
+  and fills still-empty fields on an existing session without overwriting a set value; `store_memory`
+  and `import_document` expose them. The Claude Code hooks (`alexandria-recall.sh` detector stores,
+  `alexandria-extract.sh`, the `alexandria-session.sh` injection) and the Pi extension still send only
+  `session_id`, so every session row still shows both as null. `alexandria-session.sh` is the one
+  place that could stamp `agent_id: "claude-code"` for every interactive store in one line; `model`
+  is not in the hook payload. Add when a session view wants to tell agents apart.
 - [-] **`raw` record carries no session.** The 2026-09-08 `import_document` session linkage attaches
   the chunks only; the `raw` document record is reachable from them via `extracted_from` but has no
   session edge of its own. Parked 2026-09-08: `contains_session_memory` is declared `IN session OUT fact`,
