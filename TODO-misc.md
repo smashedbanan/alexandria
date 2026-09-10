@@ -67,6 +67,10 @@ Open code items. Rationale for settled decisions lives in the docs and commit hi
 - [-] **`tokenizers` is pinned to 0.22 by candle-core 0.11.** 0.23 builds a second copy, and
   candle-core enables the `onig` feature itself, so our `default-features = false` cannot drop the C
   build. Both move together on the next candle bump.
+- [-] **`RUSTSEC-2023-0071` (Marvin attack in `rsa`) is ignored in `deny.toml`.** `rsa` 0.9.10
+  reaches us via `surrealdb-core -> jsonwebtoken`; nothing here uses RSA. No patched release exists
+  (0.10 is still a release candidate). Drop the ignore once `cargo deny` stops needing it, i.e.
+  when surrealdb picks up a `jsonwebtoken` built on `rsa` 0.10.
 
 ## Pi extension
 
