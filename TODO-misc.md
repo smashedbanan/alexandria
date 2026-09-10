@@ -78,9 +78,6 @@ Open code items. Rationale for settled decisions lives in the docs and commit hi
   `serializeEntries` only advances `turnNum` on user text, so an image-only user message and the
   assistant's answer to it are both labelled with the prior turn. Label the assistant line by its own
   counter if the extraction prompt ever starts misattributing answers.
-- [ ] **Test files import `.ts` specifiers; nothing typechecks them.** `tsconfig.json` lacks
-  `allowImportingTsExtensions`, so `tsc` would reject every `*.test.ts`. Nothing runs `tsc` today;
-  add `allowImportingTsExtensions` + `noEmit` if a typecheck step is ever wired.
 - [-] **The pi extension never calls `finalize_session`.** Auto-store writes are grouped under
   pi's session id, but no summary or tags are attached at `session_shutdown`. The extraction prompt
   already runs one LLM call there; extending it to return a summary and calling `finalize_session`
@@ -88,6 +85,11 @@ Open code items. Rationale for settled decisions lives in the docs and commit hi
 - [-] **Auto-recall is not session-scoped.** `retrieveMemories` never passes `session_id`, so a
   resumed pi session recalls across everything. Pass `ctx.sessionManager.getSessionId()` if
   same-session recall ever matters more than cross-session recall.
+- [-] **`typecheck-pi` checks against whatever `pi-coding-agent` the lockfile holds.**
+  `package.json` says `latest` but `npm ci` installs the locked `0.84.2`, so the types only move
+  when someone runs `npm install` or Dependabot bumps the lock. A failing typecheck after a lock
+  bump means upstream changed `ExtensionAPI`, not that our code regressed; pin the version if that
+  starts happening.
 - [ ] **Every store call site rebuilds the session args.** `sessionArgs(ctx)` is called at four
   sites in `index.ts` because `storeMemory` lives in `mcp-client.ts`, which has no `ctx`. Fine at
   four; fold it into a per-session store closure if a fifth appears.
