@@ -42,10 +42,6 @@ Open code items. Rationale for settled decisions lives in the docs and commit hi
   `0.40` delivers 16/20 at 2.95 noise against `0.45`'s 14/20 at 1.65. Re-read the grid for the
   pair with the recent targets in, then update the two docs and, if the pair moves, the defaults
   in `contrib/claude/hooks/alexandria-recall.sh` and `contrib/pi/.../config.ts`.
-- [ ] **`report()` prints each target's rank but not its score.** Which targets fall in a
-  threshold band has to be inferred from `hits_kept` differences between rows (the 2026-09-10
-  pass could only say "two of the eight new targets score between 0.40 and 0.45"). Print
-  `hit_scores` next to the rank in the per-question table.
 - [-] **The baseline is reconstructed by size, not recorded.** `BASELINE_SIZE = 143` takes the 143
   oldest active facts. Deleting a fact inside that window lets it reach forward, and `update_memory`
   keeps the record ID while rewriting content, so a frozen `QUESTIONS` target can silently start
