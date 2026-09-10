@@ -142,7 +142,26 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
   target and read 0 headroom at 927 facts on question 12 ("how fast is memory lookup") — a false
   alarm: that target scores 0.379, under the shipped `T = 0.45`, so the client drops it at any limit.
   Now counts only targets at or above `RECALL_THRESHOLD` (new const beside `RECALL_LIMIT`); on that
-  basis the worst kept rank at 927 is question 1 at 8, headroom 2. **`limit = 10` has a shelf life and
+  basis the worst kept rank at 927 is question 1 at 8, headroom 2.
+- [-] **The corpus crowding question 12 is mostly memories about the benchmark** (2026-09-10,
+  seen while checking the headroom guard). The ten facts outranking its target ("recall latency
+  target is 300ms") on the live server include the frozen-question-set gotcha, the flat-cosine-scan
+  note, the 8-of-12 caveat, and the "limit is intentionally conservative" decision — all extracted
+  from sessions working on `bench-retrieval`. Every bench session adds distractors that mention
+  memory lookup, so this question's rank inflation is partly self-inflicted and not a fair proxy
+  for the corpus at large. Parked: nothing to fix in the bench, but do not cite q12's rank as
+  evidence about retrieval on other topics, and prefer targets outside this project's own
+  vocabulary when the question set is extended (the `[ ]` recent-facts item above).
+- [-] **`bench-retrieval` scores a restated target as a miss** (2026-09-10, same check). Question
+  1's target (symlink hook install, `fact:114neszsc6wf6roti3nh`) ranks 8, but ranks 1 and 2 are two
+  other extracted memories saying the same thing at 0.62 and 0.59 against the target's 0.47. A
+  user asking that question gets the answer at rank 1; the bench records rank 8 and it is the
+  worst kept rank in the 927 pass, so the two-position headroom figure is set by a duplicate, not
+  a real miss. The measured MiniLM dedup gap (duplicates and adjacent memories both score
+  0.63-0.76 against each other) means the bench cannot detect this automatically either. Parked:
+  treat rank as a lower bound on delivery, and when the headroom WARN fires, read the results
+  above the target before acting on it.
+ **`limit = 10` has a shelf life and
   nothing watches it** (2026-09-09, from the pass that set it). The value was chosen because delivery saturates there, and it saturates there because the
   worst of the 12 target ranks at 880 facts is 9 — one below the window. That is a property of the
   corpus, not the model, and rank has inflated at every pass (worst rank was 4 at 143 facts). So the
@@ -180,9 +199,10 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
   quietly shrink with no signal. Parked because no client will be configured under 3 and dropping the
   row would lose the noise-reduction end of the curve — but do not read the `limit = 3` row as a
   recommendation without re-checking `activation.top_n` first.
-- [-] **A client recall default has to be applied in nine places by hand** (2026-09-09; filed as
-  "four places" and corrected the same day by the grep that applied the 5 -> 10 / 0.35 -> 0.45
-  change). The authoritative two are `contrib/claude/hooks/alexandria-recall.sh:31,37` and
+- [-] **A client recall default has to be applied in ten places by hand** (2026-09-09; filed as
+  "four places", corrected to nine the same day by the grep that applied the 5 -> 10 / 0.35 -> 0.45
+  change, and to ten on 2026-09-10 when `src/bench.rs` gained `RECALL_THRESHOLD` beside
+  `RECALL_LIMIT` for the headroom check). The authoritative two are `contrib/claude/hooks/alexandria-recall.sh:31,37` and
   `contrib/pi/extensions/alexandria-auto-recall/src/config.ts:75,86`. The other seven restate them:
   `docs/configuration.md` twice (the `[recall]` example block and the key table), `src/bench.rs`
   (`RECALL_LIMIT` plus the `THRESHOLDS` doc comment), `contrib/pi/README.md` (prose and example
