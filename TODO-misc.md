@@ -78,10 +78,10 @@ Open code items. Rationale for settled decisions lives in the docs and commit hi
   `serializeEntries` only advances `turnNum` on user text, so an image-only user message and the
   assistant's answer to it are both labelled with the prior turn. Label the assistant line by its own
   counter if the extraction prompt ever starts misattributing answers.
-- [-] **The pi extension never calls `finalize_session`.** Auto-store writes are grouped under
-  pi's session id, but no summary or tags are attached at `session_shutdown`. The extraction prompt
-  already runs one LLM call there; extending it to return a summary and calling `finalize_session`
-  on `quit`/`new`/`resume`/`fork` (not `reload`) is the next step if unsummarized sessions pile up.
+- [-] **Shutdown `finalize_session` errors are swallowed, including real ones.** The call fails
+  by design on a chat-only session ("Session not found", the session was never created), and the
+  `.catch(() => {})` hides an unreachable server or a rejected summary the same way. Match on the
+  error text and notify on anything else if finalized sessions stop appearing.
 - [-] **Auto-recall is not session-scoped.** `retrieveMemories` never passes `session_id`, so a
   resumed pi session recalls across everything. Pass `ctx.sessionManager.getSessionId()` if
   same-session recall ever matters more than cross-session recall.
@@ -91,8 +91,8 @@ Open code items. Rationale for settled decisions lives in the docs and commit hi
   bump means upstream changed `ExtensionAPI`, not that our code regressed; pin the version if that
   starts happening.
 - [ ] **Every store call site rebuilds the session args.** `sessionArgs(ctx)` is called at four
-  sites in `index.ts` because `storeMemory` lives in `mcp-client.ts`, which has no `ctx`. Fine at
-  four; fold it into a per-session store closure if a fifth appears.
+  sites in `index.ts` because `storeMemory` and `finalizeSession` live in `mcp-client.ts`, which
+  has no `ctx`. Fine at four; fold it into a per-session store closure if a fifth appears.
 
 ## Claude Code integration
 
