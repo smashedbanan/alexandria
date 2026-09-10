@@ -18,12 +18,8 @@ Open code items. Rationale for settled decisions lives in the docs and commit hi
   Integration tests cannot see `cfg(test)` items, so it is `pub` behind `#[doc(hidden)]`. A
   `test-util` cargo feature would hide it properly; add one if a second such hook appears.
 
-- [-] **Retrieval is a flat scan.** `do_retrieve_memories` loads every active fact
-  (`SELECT * FROM fact WHERE deleted = false`, `alexandria-mcp/src/server.rs`) and scores it in the
-  engine; no migration defines a vector index. Fine at ~1k facts. Add an HNSW/MTREE index and push the
-  top-k into the query when the scan shows up in latency.
 - [-] **`alexandria-mcp` still issues inline SurrealDB queries.** Five sites in `server.rs`
-  (provenance create, the fact scan above, centroid update, `raw` create, cluster list) bypass the
+  (provenance create, the KNN retrieve query, centroid update, `raw` create, cluster list) bypass the
   storage crate. Move them into repos as they get touched; do not add new ones.
 - [-] **Cluster `member_count` is one query per cluster.** `load_cluster_infos()` calls
   `get_members()` for each cluster. Batch it when cluster counts grow.
@@ -36,6 +32,12 @@ Open code items. Rationale for settled decisions lives in the docs and commit hi
 
 ### `bench-retrieval`
 
+- [ ] **The bench scores the exact scan; the server serves HNSW top-k.** `measure()` ranks every
+  fact with `cosine_similarity` in process, so an `ef`/`M` change to the index never shows up in the
+  metrics. On the 982-fact corpus at `ef=40` the top-10 overlap with the exact scan was 200/200,
+  so this is not urgent. Add a per-question overlap check that goes through
+  `SELECT ... embedding <|k,COSINE|> $q` on the same corpus, so the bench measures what the server
+  returns.
 - [-] **The baseline is reconstructed by size, not recorded.** `BASELINE_SIZE = 143` takes the 143
   oldest active facts. Deleting a fact inside that window lets it reach forward, and `update_memory`
   keeps the record ID while rewriting content, so a frozen `QUESTIONS` target can silently start
