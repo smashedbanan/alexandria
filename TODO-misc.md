@@ -18,9 +18,9 @@ Open code items. Rationale for settled decisions lives in the docs and commit hi
   Integration tests cannot see `cfg(test)` items, so it is `pub` behind `#[doc(hidden)]`. A
   `test-util` cargo feature would hide it properly; add one if a second such hook appears.
 
-- [-] **`alexandria-mcp` still issues inline SurrealDB queries.** Four sites in `server.rs`
-  (provenance create, centroid update, `raw` create, cluster list) bypass the storage crate. Move
-  them into repos as they get touched; do not add new ones.
+- [-] **`alexandria-mcp` still issues one inline SurrealDB query.** The `provenance` create in
+  `do_store_memory` (`server.rs`) bypasses the storage crate. It is maintained by someone else, so
+  leave it; do not add new ones.
 - [-] **Cluster `member_count` is one query per cluster.** `load_cluster_infos()` calls
   `get_members()` for each cluster. Batch it when cluster counts grow.
 - [-] **`recall` walks clusters, not sessions.** Sessions are reachable only through the session

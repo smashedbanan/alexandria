@@ -23,7 +23,7 @@ These will bite you. SurrealDB 3.2 differs from docs and prior versions:
 
 ## Architecture Boundaries
 
-- **storage** owns all DB access — no raw SurrealDB queries outside this crate (the `alexandria-mcp` handlers still issue some inline queries directly; don't add new ones without reason)
+- **storage** owns all DB access — no raw SurrealDB queries outside this crate (the `alexandria-mcp` `provenance` create in `do_store_memory` is the one remaining inline query and is maintained elsewhere; don't add new ones)
 - **engine** is pure algorithms — no DB, no async (except test helpers). Takes data in, returns results.
 - **pipeline** owns embedding — abstracts over providers via `EmbeddingProvider` trait
 - **mcp** wires tools to engine+storage — the only crate that knows about both. Also owns the debug web UI (`alexandria-mcp/src/debug/`), which is Axum handlers over the same repos.
@@ -67,7 +67,7 @@ Both must pass clean first. Do not skip the gate to "just see if it compiles".
 ## Testing
 
 - Use the `just` recipes (they match CI): `just test`, `just lint`, `just fmt`, `just ci` (fmt + lint + test + `cargo deny`). `just install-hooks` wires `.githooks/pre-commit`.
-- Run tests on **stable**, not nightly: `diskann-wide` (SurrealDB transitive dep) fails trait inference on its NEON intrinsics under recent nightlies on aarch64, and the failure looks like it originates in this workspace. Current suite: 156 tests, all green.
+- Run tests on **stable**, not nightly: `diskann-wide` (SurrealDB transitive dep) fails trait inference on its NEON intrinsics under recent nightlies on aarch64, and the failure looks like it originates in this workspace. Current suite: 157 tests, all green.
 - All integration tests use `Database::connect_embedded()` (in-memory SurrealDB) — no disk state between tests.
 - `CandleProvider` tests download the real model on first run (~80MB) — they're slow the first time.
 - Test helpers in `alexandria-storage/src/connection.rs`: `connect_embedded()` for quick in-memory DB.
