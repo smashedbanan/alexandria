@@ -89,9 +89,6 @@ Open code items. Rationale for settled decisions lives in the docs and commit hi
   when someone runs `npm install` or Dependabot bumps the lock. A failing typecheck after a lock
   bump means upstream changed `ExtensionAPI`, not that our code regressed; pin the version if that
   starts happening.
-- [ ] **Every store call site rebuilds the session args.** `sessionArgs(ctx)` is called at four
-  sites in `index.ts` because `storeMemory` and `finalizeSession` live in `mcp-client.ts`, which
-  has no `ctx`. Fine at four; fold it into a per-session store closure if a fifth appears.
 
 ## Claude Code integration
 
