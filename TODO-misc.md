@@ -86,8 +86,16 @@ Open code items. Rationale for settled decisions lives in the docs and commit hi
 - [ ] **Test files import `.ts` specifiers; nothing typechecks them.** `tsconfig.json` lacks
   `allowImportingTsExtensions`, so `tsc` would reject every `*.test.ts`. Nothing runs `tsc` today;
   add `allowImportingTsExtensions` + `noEmit` if a typecheck step is ever wired.
-- [-] **The pi extension does not use sessions.** Auto-store writes carry no `session_id`, so
-  that traffic is ungrouped.
+- [-] **The pi extension never calls `finalize_session`.** Auto-store writes are grouped under
+  pi's session id, but no summary or tags are attached at `session_shutdown`. The extraction prompt
+  already runs one LLM call there; extending it to return a summary and calling `finalize_session`
+  on `quit`/`new`/`resume`/`fork` (not `reload`) is the next step if unsummarized sessions pile up.
+- [-] **Auto-recall is not session-scoped.** `retrieveMemories` never passes `session_id`, so a
+  resumed pi session recalls across everything. Pass `ctx.sessionManager.getSessionId()` if
+  same-session recall ever matters more than cross-session recall.
+- [ ] **Every store call site rebuilds the session args.** `sessionArgs(ctx)` is called at four
+  sites in `index.ts` because `storeMemory` lives in `mcp-client.ts`, which has no `ctx`. Fine at
+  four; fold it into a per-session store closure if a fifth appears.
 
 ## Claude Code integration
 
