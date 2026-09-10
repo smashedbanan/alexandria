@@ -140,7 +140,7 @@ milestone:
 - ~~**Extension does not use sessions.**~~ Done 2026-09-10: every auto-store write carries pi's
   session id as `session_id`, plus `agent_id="pi"` and the active model. Sessions are never
   finalized by the extension; `list_sessions(agent_id="pi")` finds them.
-- **README said MIT.** Corrected to AGPL-3.0-or-later to match `LICENSE` and
+- ~~**README said MIT.**~~ Done: corrected to AGPL-3.0-or-later to match `LICENSE` and
   `license.workspace`; verified nothing else in-tree still claims MIT (`deny.toml`'s MIT entries are
   third-party license allow-listing, which is unrelated). If the GitHub repo's advertised license
   badge still reads MIT, that is an API-side setting, not a file.
