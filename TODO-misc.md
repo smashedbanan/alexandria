@@ -78,10 +78,11 @@ Open code items. Rationale for settled decisions lives in the docs and commit hi
   `serializeEntries` only advances `turnNum` on user text, so an image-only user message and the
   assistant's answer to it are both labelled with the prior turn. Label the assistant line by its own
   counter if the extraction prompt ever starts misattributing answers.
-- [-] **Shutdown `finalize_session` errors are swallowed, including real ones.** The call fails
-  by design on a chat-only session ("Session not found", the session was never created), and the
-  `.catch(() => {})` hides an unreachable server or a rejected summary the same way. Match on the
-  error text and notify on anything else if finalized sessions stop appearing.
+- [ ] **`storeMemory` never reads the result body.** The server's `store_memory` tool reports
+  failures as a normal text result (`{"status":"error",...}`), not an MCP error, so a rejected
+  store resolves as success and the `.catch(() => {})` on the shutdown store loop in `index.ts`
+  only ever sees transport errors. `finalizeSession` reads its body via `finalize-result.ts`;
+  do the same here if stored memories go missing.
 - [-] **Auto-recall is not session-scoped.** `retrieveMemories` never passes `session_id`, so a
   resumed pi session recalls across everything. Pass `ctx.sessionManager.getSessionId()` if
   same-session recall ever matters more than cross-session recall.
