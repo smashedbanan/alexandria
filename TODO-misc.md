@@ -36,11 +36,16 @@ Open code items. Rationale for settled decisions lives in the docs and commit hi
 
 ### `bench-retrieval`
 
-- [ ] **The question set only targets facts from the original 143.** Everything stored since is a
-  distractor, never a correct answer, so the bench never checks that a recent memory can be found.
-  Add questions targeting recent facts before reading it as a general quality signal. Prefer targets
-  outside this project's own vocabulary: memories about the bench itself crowd the "memory lookup"
-  question, so its rank says little about other topics.
+- [ ] **The shipped recall pair was read off the 12-question grid and the 20-question grid
+  disagrees on one claim.** `docs/configuration.md` and `docs/minilm-test-data.md` say `T=0.40`
+  is strictly dominated by `0.45`. On the 957-fact, 20-question pass at `limit=10` it is not:
+  `0.40` delivers 16/20 at 2.95 noise against `0.45`'s 14/20 at 1.65. Re-read the grid for the
+  pair with the recent targets in, then update the two docs and, if the pair moves, the defaults
+  in `contrib/claude/hooks/alexandria-recall.sh` and `contrib/pi/.../config.ts`.
+- [ ] **`report()` prints each target's rank but not its score.** Which targets fall in a
+  threshold band has to be inferred from `hits_kept` differences between rows (the 2026-09-10
+  pass could only say "two of the eight new targets score between 0.40 and 0.45"). Print
+  `hit_scores` next to the rank in the per-question table.
 - [-] **The baseline is reconstructed by size, not recorded.** `BASELINE_SIZE = 143` takes the 143
   oldest active facts. Deleting a fact inside that window lets it reach forward, and `update_memory`
   keeps the record ID while rewriting content, so a frozen `QUESTIONS` target can silently start
