@@ -74,9 +74,18 @@ Open code items. Rationale for settled decisions lives in the docs and commit hi
 
 ## Pi extension
 
-- [ ] **No tests for the pi extension.** The detector regexes in
-  `contrib/pi/extensions/alexandria-auto-recall/src/detectors/` and the extraction prompt have no
-  coverage, so a pattern edit is unguarded.
+- [ ] **`ErrorTracker.recordSuccess` consumes the error before checking the success text.** An
+  empty success on the same tool removes the pending error and records nothing, so the next real
+  success has nothing to pair with. Move the empty-text check above the `splice`.
+- [ ] **`serializeEntries` counts an empty user message as a turn.** `turnNum` increments before
+  the text check, so a user entry with no text blocks leaves a gap in the numbering the prompt
+  shows the model. Pinned as-is in `extraction-parse.test.ts`; increment after the check.
+- [ ] **`use X instead of Y` fires both detectors.** The same prompt stores a `User correction:`
+  and a `User preference:` memory with different wording, so the dedup buffer does not catch it.
+  Pinned in `preference.test.ts`. Drop the pattern from one detector.
+- [ ] **Test files import `.ts` specifiers; nothing typechecks them.** `tsconfig.json` lacks
+  `allowImportingTsExtensions`, so `tsc` would reject every `*.test.ts`. Nothing runs `tsc` today;
+  add `allowImportingTsExtensions` + `noEmit` if a typecheck step is ever wired.
 - [-] **The pi extension does not use sessions.** Auto-store writes carry no `session_id`, so
   that traffic is ungrouped.
 
