@@ -53,7 +53,7 @@ These will bite you. SurrealDB 3.2 differs from docs and prior versions:
 - Every split/merge is recorded in the `maintenance_log` table (`v004`) and surfaced at `/debug/maintenance`. If cluster behavior looks wrong, that table is the audit trail.
 - Sessions are created implicitly by `store_memory(session_id)` — there is no create tool. `SessionRepo::touch()` bumps `ended_at`, so `ended_at` means last-activity; only a non-null `summary` distinguishes a finalized session. `memory_count` is computed live, not stored (`v006` dropped the column). See `docs/session-memory.md`.
 - Schema migrations are forward-only, numbered (`v001`, `v002`, ...), tracked in `system_config` table. Current head is `v006_drop_session_memory_count.surql`.
-- Embedding model is locked on first boot — changing `config.toml` model without wiping data will refuse to start.
+- Embedding model is locked on first boot — changing `config.toml` model without wiping data will refuse to start. The truncation limit (`MAX_TOKENS` in `candle.rs`, 256) is locked the same way as `embedding_max_tokens`; a lock without that key means the corpus was embedded at the tokenizer's shipped 128, and boot refuses until `alexandria migrate-embeddings` re-embeds it.
 
 ## Build Gate
 
@@ -67,7 +67,7 @@ Both must pass clean first. Do not skip the gate to "just see if it compiles".
 ## Testing
 
 - Use the `just` recipes (they match CI): `just test`, `just lint`, `just fmt`, `just ci` (fmt + lint + test + `cargo deny`). `just install-hooks` wires `.githooks/pre-commit`.
-- Run tests on **stable**, not nightly: `diskann-wide` (SurrealDB transitive dep) fails trait inference on its NEON intrinsics under recent nightlies on aarch64, and the failure looks like it originates in this workspace. Current suite: 157 tests, all green.
+- Run tests on **stable**, not nightly: `diskann-wide` (SurrealDB transitive dep) fails trait inference on its NEON intrinsics under recent nightlies on aarch64, and the failure looks like it originates in this workspace. Current suite: 162 tests, all green.
 - All integration tests use `Database::connect_embedded()` (in-memory SurrealDB) — no disk state between tests.
 - `CandleProvider` tests download the real model on first run (~80MB) — they're slow the first time.
 - Test helpers in `alexandria-storage/src/connection.rs`: `connect_embedded()` for quick in-memory DB.
