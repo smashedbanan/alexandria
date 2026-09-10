@@ -36,10 +36,6 @@ Open code items. Rationale for settled decisions lives in the docs and commit hi
 
 ### `bench-retrieval`
 
-- [ ] **The grid prints `noise_per_q` to one decimal; the sweep prints two.** `report()` in
-  `src/bench.rs` formats grid cells with `{:.1}`, so the 1.5-vs-1.65 gap that decides whether
-  `limit=3, T=0.40` dominates the shipped cell is invisible in the grid and has to be read off
-  the sweep. Print two decimals in the grid.
 - [-] **The baseline is reconstructed by size, not recorded.** `BASELINE_SIZE = 143` takes the 143
   oldest active facts. Deleting a fact inside that window lets it reach forward, and `update_memory`
   keeps the record ID while rewriting content, so a frozen `QUESTIONS` target can silently start
