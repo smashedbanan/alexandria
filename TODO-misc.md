@@ -89,7 +89,8 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
   selects nothing, which is how the size-based reconstruction came about (every other bare timestamp
   in these plan docs is local too). If the baseline row ever stops reproducing, suspect this before
   suspecting the metrics.
-- [ ] **`bench-retrieval` silently truncates the corpus at 100,000 facts, oldest-first** (2026-09-09,
+- [x] Done 2026-09-09: `run()` bails when `all.len()` reaches `CORPUS_CAP`, per the fix named
+  below. **`bench-retrieval` silently truncates the corpus at 100,000 facts, oldest-first** (2026-09-09,
   found by adversarial review). `src/bench.rs` reads the corpus with
   `MemoryRepo::list(None, None, false, 100_000, 0)`, and `memory_repo.rs:146` orders
   `created_at DESC` — so past 100k facts `all` holds the *newest* 100k. The baseline window then
@@ -136,8 +137,11 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
   reaches a user only through this limit, and at 143 facts the worst rank was 4, so `limit = 5`
   saturated and the lever was invisible. That item's standing ask (append a pass at each corpus size)
   still stands.
-- [ ] **`limit = 10` has a shelf life and nothing watches it** (2026-09-09, from the pass that set
-  it). The value was chosen because delivery saturates there, and it saturates there because the
+- [x] Done 2026-09-09: `report()` prints `max(ranks)` against `RECALL_LIMIT` as a headroom line, and
+  a `WARN` naming the hidden targets once any rank exceeds it. First run, 927 facts (server stopped
+  for the copy): worst rank 10, headroom 0 — question 12 ("how fast is memory lookup") sits exactly
+  on the limit. **`limit = 10` has a shelf life and
+  nothing watches it** (2026-09-09, from the pass that set it). The value was chosen because delivery saturates there, and it saturates there because the
   worst of the 12 target ranks at 880 facts is 9 — one below the window. That is a property of the
   corpus, not the model, and rank has inflated at every pass (worst rank was 4 at 143 facts). So the
   headroom is one position wide and shrinking, and when it goes the symptom is the one this whole
