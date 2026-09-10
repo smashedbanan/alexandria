@@ -137,10 +137,12 @@ Open items noticed while getting Alexandria running under Claude Code (2026-09-0
   reaches a user only through this limit, and at 143 facts the worst rank was 4, so `limit = 5`
   saturated and the lever was invisible. That item's standing ask (append a pass at each corpus size)
   still stands.
-- [x] Done 2026-09-09: `report()` prints `max(ranks)` against `RECALL_LIMIT` as a headroom line, and
-  a `WARN` naming the hidden targets once any rank exceeds it. First run, 927 facts (server stopped
-  for the copy): worst rank 10, headroom 0 — question 12 ("how fast is memory lookup") sits exactly
-  on the limit. **`limit = 10` has a shelf life and
+- [x] Done 2026-09-09: `report()` prints the worst rank against `RECALL_LIMIT` as a headroom line,
+  and a `WARN` naming the hidden targets once any rank exceeds it. The first version counted every
+  target and read 0 headroom at 927 facts on question 12 ("how fast is memory lookup") — a false
+  alarm: that target scores 0.379, under the shipped `T = 0.45`, so the client drops it at any limit.
+  Now counts only targets at or above `RECALL_THRESHOLD` (new const beside `RECALL_LIMIT`); on that
+  basis the worst kept rank at 927 is question 1 at 8, headroom 2. **`limit = 10` has a shelf life and
   nothing watches it** (2026-09-09, from the pass that set it). The value was chosen because delivery saturates there, and it saturates there because the
   worst of the 12 target ranks at 880 facts is 9 — one below the window. That is a property of the
   corpus, not the model, and rank has inflated at every pass (worst rank was 4 at 143 facts). So the
