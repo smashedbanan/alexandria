@@ -35,7 +35,7 @@ In:
   `alexandria-engine`.
 - Migration `v007` and the repo methods listed below.
 - `[llm]` config section with env overrides.
-- Enrichment pass in the maintenance task; the task moves from `src/main.rs` to
+- Enrichment pass in the maintenance task; the task moves from `crates/alexandria/src/main.rs` to
   `src/maintenance.rs`.
 - `retrieve_memories` result field `contradicts`, `recall` reading the real label, `update_memory`
   resetting relation state on content change.

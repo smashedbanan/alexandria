@@ -97,7 +97,7 @@ technical statements, and small mean-pooled MiniLM appears to be the right shape
 ## Third pass (2026-09-09): same model, 5x corpus
 
 Moved to `docs/minilm-test-data.md`, which is maintained; these plan docs are not. MiniLM
-was rerun alone against the grown corpus with `alexandria bench-retrieval` (`src/bench.rs`),
+was rerun alone against the grown corpus with `alexandria bench-retrieval` (`crates/alexandria/src/bench.rs`),
 which also computes the retrieve floor from the model's own output instead of by hand. The
 reconstructed 143-fact baseline reproduces the first-pass row above on every column and
 every per-question rank; at 743 facts `mean_rank` goes 1.42 -> 2.75, `top1` 9/12 -> 7/12 and

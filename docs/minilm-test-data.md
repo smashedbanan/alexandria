@@ -4,7 +4,7 @@ Measurements for `sentence-transformers/all-MiniLM-L6-v2`, the embedding model A
 runs on. This is the living record; the model-selection passes that chose it are historical
 and live in `docs/plans/2026-09-08-embedding-model-swap-measurements.md`.
 
-Produced by `alexandria bench-retrieval` (`src/bench.rs`).
+Produced by `alexandria bench-retrieval` (`crates/alexandria/src/bench.rs`).
 
 ## Running it
 
@@ -527,7 +527,7 @@ and silently break comparability with the recorded tables.
 
 ## Test data
 
-Question → the fact that answers it; the list is `QUESTIONS` in `src/bench.rs`. Questions
+Question → the fact that answers it; the list is `QUESTIONS` in `crates/alexandria/src/bench.rs`. Questions
 1–12 are frozen from the 2026-09-08 run and every target is inside the baseline window.
 Questions 13–20 were added 2026-09-10 and target facts stored 2026-09-09 from other projects;
 they are absent from the baseline corpus and print as `absent` on that row.

@@ -553,7 +553,7 @@ pub async fn run() -> anyhow::Result<()> {
         all.len() < CORPUS_CAP,
         "corpus hit the {CORPUS_CAP}-fact read cap; the read is newest-first, so the oldest facts \
          (the baseline window and the frozen QUESTIONS targets) are missing and every metric would \
-         be wrong without saying so. Raise CORPUS_CAP in src/bench.rs."
+         be wrong without saying so. Raise CORPUS_CAP in crates/alexandria/src/bench.rs."
     );
     let oldest = all.iter().filter_map(|(_, _, c)| *c).min();
     let newest = all.iter().filter_map(|(_, _, c)| *c).max();
@@ -574,7 +574,7 @@ pub async fn run() -> anyhow::Result<()> {
     anyhow::ensure!(
         live_metrics.scored > 0,
         "none of the {} benchmark questions' target facts exist in this corpus — the `fact:` \
-         record IDs in QUESTIONS (src/bench.rs) are frozen from the install the question set was \
+         record IDs in QUESTIONS (crates/alexandria/src/bench.rs) are frozen from the install the question set was \
          built on, so bench-retrieval only measures that database. Every metric would be NaN or inf.",
         QUESTIONS.len()
     );
