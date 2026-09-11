@@ -100,9 +100,9 @@ three levels:
    write side it adds heuristic detectors (corrections, stated preferences, error→resolution pairs)
    that store without being asked, plus an LLM extraction pass at `session_shutdown` for durable facts
    both the agent and the heuristics missed. This trades latency and potential noise for guaranteed
-   recall and much denser capture. The Claude Code equivalent of the recall half is a
-   `UserPromptSubmit` hook at
-   [`contrib/claude/hooks/alexandria-recall.sh`](contrib/claude/hooks/alexandria-recall.sh).
+   recall and much denser capture. The Claude Code equivalent is the set of `UserPromptSubmit`,
+   `PreToolUse`, and `Stop` hooks at
+   [`contrib/claude/hooks/`](contrib/claude/hooks/).
 
 Items 2 and 3 are client-side integrations, not part of the MCP server itself — see
 [`contrib/pi/README.md`](contrib/pi/README.md) and [`contrib/claude/README.md`](contrib/claude/README.md)

@@ -61,6 +61,13 @@ Open code items. Rationale for settled decisions lives in the docs and commit hi
   a snapshot, so every edit to `.githooks/pre-commit` needs a re-run and nothing warns that the
   installed copy is stale. A symlink breaks on Windows checkouts without developer mode; leave the
   copy unless staleness bites.
+- [ ] **`.cargo/config.toml` and `rust-toolchain.toml` were dropped when this branch was integrated
+  into main (2026-09-09).** Decision: linker/CPU flags are per-machine developer preference, not
+  repo policy — the file only ever affected local x86-64 Linux gnu builds (CI's ubuntu jobs would
+  have broken on the missing `mold`, and the Docker build already overrides `rustflags` via
+  `RUSTFLAGS`, so neither `target-cpu` nor mold applied there). Dev boxes wanting it keep
+  `-C target-cpu=native` + mold in `~/.cargo/config.toml`. Windows `target-cpu` verification is
+  moot. Repo keeps `rust-version = "1.98"` + edition 2024 as the only compiler floor statement.
 
 ## Dependencies
 
