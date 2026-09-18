@@ -1,7 +1,8 @@
 # Upstream PR Stack: Rebase onto main and Apply the 2026-09-16 Review Round
 
 **Date:** 2026-09-17
-**Status:** Approved design, pre-implementation.
+**Status:** Approved design, pre-implementation. Amended 2026-09-17 after the plan-writing pass
+found that upstream relocated the pi extension (decision 8).
 **Scope:** PRs #9–#19 on `cebarks/alexandria`. Issues #22–#28 stay open as follow-ups; the only
 issue whose content lands here is #27, because it defines the rules for the #18 redo.
 
@@ -19,9 +20,18 @@ reviewer what changed. Rejected pieces are parked on local bookmarks, not lost a
 - Upstream `main` gained five commits: `19a20d9` (debug UI overhaul, CSRF guard, sortable
   memories), `dcf93f0` (Containerfile), `7487c1c` (cargo update), `8b9127c` (container workflow
   fix), `e251a5e` (PR #21, agent reminders, landed **after** the review round). The reminders PR
-  adds `v007_reminder.surql` and touches the pi extension, so:
+  adds `v007_reminder.surql` and relocates the pi extension, so:
   - anything the reviews call "v007" becomes v008 when it is eventually designed (#25);
-  - `pr/b` (pi extension) now has 20 textual conflicts, more than any stack layer.
+  - `pr/b` (pi extension) cannot be rebased mechanically (see below).
+- **The pi extension moved.** `contrib/pi/extensions/alexandria-auto-recall/` is gone; `main` has
+  `contrib/pi/extensions/alexandria/`. The five detector files and `extraction.ts` moved with
+  zero content change. `index.ts` (+123 lines), `config.ts`, `mcp-client.ts` and `recall.ts`
+  were rewritten for reminders, and `injection.ts`/`reminders.ts` are new. Tests now live in
+  `tests/*.test.ts`, run by `tsx --test` after `npm ci`; `just ext-test` runs typecheck + tests
+  and CI has a "Pi companion" job. `main`'s recall defaults are still `limit 5` /
+  `min_similarity 0.58`, and `main`'s AGENTS.md names the detector regexes as the remaining
+  unguarded gap. jj rebases without rename detection, so every `pr/b` commit would conflict as
+  modify/delete against the deleted directory.
 - Upstream rewrote `v001`–`v006` with `DEFINE ... OVERWRITE`. No stack PR adds a migration, so
   there is no numbering collision in this pass.
 - No stack feature exists on `main` (`ensure_vector_index`, `list_sessions`, `find_or_create`,
@@ -50,26 +60,30 @@ reviewer what changed. Rejected pieces are parked on local bookmarks, not lost a
    README and `docs/roadmap.md` say "run `just test`" instead of a number.
 7. **#18 reuses its branch and PR.** The review said "closing for a redo" but the PR is still
    open and draft, so the redo is a force-push to `pr/b-pi-extension`.
+8. **#18 is excluded from Phase 0 and rebuilt, not rebased.** Phase 0 rebases the other ten
+   PRs. #18 gets a comment saying it will be rebuilt on the relocated extension. Its phase starts
+   a fresh series on `main`'s layout. `test-pi`, `typecheck-pi` and the `pi-tests` CI job are
+   dropped in favour of upstream's `ext-test` and "Pi companion" job.
 
 ## Mechanics
 
 ### Phase 0: rebase everything, push once
 
 1. `jj git fetch --remote upstream`; confirm `main@upstream` is `e251a5e`.
-2. `jj rebase -s <root of pr/s1> -d main@upstream` for the stack; the same for `pr/a`,
-   `pr/b`, `pr/c`. Resolve conflicts bottom-up so each resolution propagates upward. Go by change
-   id, not commit id, when looping over conflicted commits.
+2. `jj rebase -s <root of pr/s1> -d main@upstream` for the stack; the same for `pr/a` and
+   `pr/c`. `pr/b` stays where it is (decision 8). Resolve conflicts bottom-up so each resolution
+   propagates upward. Go by change id, not commit id, when looping over conflicted commits.
 3. If a layer has many conflicted commits editing the same file, squash that layer to one commit
-   first and rebase the squash. Expected candidate: `pr/b` (11 commits, 20 conflicts, being redone
-   anyway). Do not squash layers the reviewer accepted as shaped (#11, #14).
+   first and rebase the squash. Do not squash layers the reviewer accepted as shaped (#11, #14).
 4. Verification gate before pushing anything:
-   - `just ci` at every one of the 11 tips (`just test-pi` and `just typecheck-pi` for `pr/b`).
-   - Scratch octopus merge of the four tips (`pr/s8`, `pr/a`, `pr/b`, `pr/c`) diffed against the
-     pre-rebase octopus merge must be empty except for conflict resolutions that were forced by
+   - `just ci` at every one of the 10 rebased tips.
+   - Scratch octopus merge of the three rebased tips (`pr/s8`, `pr/a`, `pr/c`) diffed against
+     the pre-rebase octopus of the same three must differ only by conflict resolutions forced by
      `main`'s changes. Record any non-empty hunk in the rebase comment.
-5. `jj git push` all 11 bookmarks. One comment on #9: rebased onto `e251a5e`; per-PR fixes follow
-   in stack order; will ping when the stack is ready for re-review. Nothing else is said on the
-   other PRs until their fixes land.
+5. `jj git push` the 10 rebased bookmarks. One comment on #9: rebased onto `e251a5e`; per-PR
+   fixes follow in stack order; will ping when the stack is ready for re-review. One comment on
+   #18: not rebased; will be rebuilt on the relocated extension in its redo. Nothing else is said
+   on the other PRs until their fixes land.
 
 ### Phases 1–11: fix in stack order, push per PR
 
@@ -81,8 +95,9 @@ auto-rebases everything above and each conflict is resolved once. A PR is pushed
 #19 is pushed last, per the reviewer's hold.
 
 Parked bookmarks (unpushed): `parked/access-recording` (commit `e16b9a7`), `parked/store-dedup`
-(`0b15b47`), `parked/pi-finalize-shutdown` (`4ea06f0`, `1b7aadb`). Each is rebased onto the new
-tip of the layer it came from so it applies cleanly later.
+(`0b15b47`), `parked/pi-finalize-shutdown` (`4ea06f0`, `1b7aadb`), `parked/pi-old-series` (the
+pre-relocation `pr/b` tip `8bdcbbb`). The first two are rebased onto the new tip of the layer
+they came from; the pi ones stay on the old base since their paths no longer exist.
 
 ### Cross-cutting doc rule
 
@@ -232,12 +247,21 @@ are not touched.
   with the "at LIMIT=10" caveat.
 - PR body: depends on #11 (agent_id) and #13 (`docs/minilm-test-data.md`).
 
-### #18 `pr/b-pi-extension` → redo
+### #18 `pr/b-pi-extension` → rebuilt on `main`'s layout
 
-- Keep: the `node:test` suite, `typecheck-pi`, the `pi-tests` CI job, session grouping, the
-  detector fixes the review listed as good, result-body error reading, the one-word rule.
-- Park `4ea06f0` and `1b7aadb` (finalize-at-shutdown) per decision 4. README heading and text
-  about finalization removed with them.
+- New series on `main@upstream`, force-pushed to `pr/b-pi-extension`. The old commits stay
+  reachable as `parked/pi-old-series` for reference.
+- Port by path rewrite (files moved unchanged): the detector fixes the review listed as good,
+  the one-word rule, and the detector tests, which move to `tests/detectors-*.test.ts` in the
+  `tsx --test` runner. `extraction-parse.ts` and its test port the same way.
+- Re-implement against the rewritten files: session args (`session_id`, `agent_id = "pi"`,
+  model) in the new `index.ts`/`mcp-client.ts`; result-body error reading on the new client;
+  `limit 10` / `min_similarity 0.45` in the new `config.ts` with the "judgement call" wording
+  from #13.
+- Drop `test-pi`, `typecheck-pi`, the `pi-tests` CI job and the fork's `tsconfig` changes;
+  upstream's `ext-test` and "Pi companion" job cover them.
+- Finalize-at-shutdown is parked per decision 4 as the two old commits' diffs
+  (`4ea06f0`, `1b7aadb`) on `parked/pi-finalize-shutdown`; it is not ported.
 - `preference.ts` per #27: capture the trigger token and what follows (`never commit
   Cargo.lock`); add bare `don't` / `do not` patterns; delete every pattern whose capture strips a
   negation. Tests assert the stored text for the four review prompts, including that
@@ -267,7 +291,7 @@ are not touched.
 
 - `just ci` (fmt, clippy `-D warnings`, test, cargo-deny) at every tip after every phase, on
   stable Rust.
-- `just test-pi` and `just typecheck-pi` at `pr/b` tip.
+- `just ext-test` at `pr/b` tip (after `just ext-install`).
 - Cold-cache integration run for #9 as above.
 - #12's plan-shape test is the regression guard for the index.
 - #13's overlap line is re-run against the live data dir read-only (copy the dir first; the
