@@ -35,17 +35,21 @@
 **Interfaces:**
 - Produces: `/tmp/pr-rebase/tips-before.txt` with lines `<bookmark> <commit-id>` for all 11 bookmarks; Task 5 reads it.
 
-- [ ] **Step 1: Confirm nothing is dirty and the bookmarks match origin**
+- [x] **Step 1: Confirm nothing is dirty and the bookmarks match origin**
 
 Run:
 ```bash
 cd /home/derek/mnt/evo_ssd/PROJECTS/repos/git/alexandria
 jj st --no-pager | head -3
-jj bookmark list -a | grep -E '^pr/|^  @origin' | paste - - | awk '{ if ($2 != $5) print "DIVERGED", $0 }'
+for b in pr/s1-deps-tooling pr/s2-embedding-config pr/s3-sessions pr/s4-hnsw pr/s5-bench pr/s6-repo-boundary-audit pr/s7-256-tokens pr/s8-access-dedup pr/a-claude-hooks pr/b-pi-extension pr/c-docs; do
+  l=$(jj log -r "$b" --no-graph -T 'commit_id')
+  r=$(jj log -r "$b@origin" --no-graph -T 'commit_id')
+  [ "$l" = "$r" ] || echo "DIVERGED $b local=$l origin=$r"
+done
 ```
-Expected: working copy `(empty) wip`; the awk prints nothing (every `pr/*` local commit id equals its `@origin` id).
+Expected: working copy `(empty) wip`; the loop prints nothing (every `pr/*` local commit id equals its `@origin` id).
 
-- [ ] **Step 2: Confirm upstream main is still `e251a5e`**
+- [x] **Step 2: Confirm upstream main is still `e251a5e`**
 
 Run:
 ```bash
@@ -54,7 +58,7 @@ jj log -r 'main@upstream' --no-graph -T 'change_id.short() ++ " " ++ commit_id.s
 ```
 Expected: `zozrllxzknvv e251a5ed88e2`. If it moved, stop and report the new head; the spec's numbers are pinned to `e251a5e`.
 
-- [ ] **Step 3: Record all eleven tips**
+- [x] **Step 3: Record all eleven tips**
 
 Run:
 ```bash
@@ -66,7 +70,7 @@ wc -l /tmp/pr-rebase/tips-before.txt
 ```
 Expected: 11 lines, `pr/s8-access-dedup 0ba0d606…`, `pr/a-claude-hooks 821de452…`, `pr/c-docs d86435b2…`, `pr/b-pi-extension 8bdcbbbf…`.
 
-- [ ] **Step 4: Park the old pi series**
+- [x] **Step 4: Park the old pi series**
 
 Run:
 ```bash
@@ -85,7 +89,7 @@ Expected: `parked/pi-old-series: upttwknx 8bdcbbbf …`. This bookmark is never 
 **Interfaces:**
 - Produces: the ten bookmarks now sit on descendants of `zozrllxzknvv`; `/tmp/pr-rebase/conflicts-after-rebase.txt` lists conflicted change ids for Task 3.
 
-- [ ] **Step 1: Count what will move**
+- [x] **Step 1: Count what will move**
 
 Run:
 ```bash
@@ -93,15 +97,15 @@ jj log -r 'descendants(zwmsmwzpytnw | ltomxynuvtvw | qlvuunkxuosl)' --no-graph -
 ```
 Expected: `60`. If it is 71, `pr/b` is a descendant of one of the roots and the revset is wrong; stop.
 
-- [ ] **Step 2: Rebase**
+- [x] **Step 2: Rebase**
 
 Run:
 ```bash
-jj rebase -s zwmsmwzpytnw -s ltomxynuvtvw -s qlvuunkxuosl -d zozrllxzknvv 2>&1 | tail -5
+jj rebase -s zwmsmwzpytnw -s ltomxynuvtvw -s qlvuunkxuosl -d zozrllxzknvv 2>&1 | tail -20
 ```
 Expected: `Rebased 60 commits onto destination` followed by `New conflicts appeared in N commits` and a hint. jj never aborts a rebase on conflicts.
 
-- [ ] **Step 3: Confirm the bookmarks moved and the wip stack did not**
+- [x] **Step 3: Confirm the bookmarks moved and the wip stack did not**
 
 Run:
 ```bash
@@ -111,7 +115,7 @@ jj log -r 'pr/b-pi-extension' --no-graph -T 'commit_id.short() ++ "\n"'
 ```
 Expected: `60`, `0`, `8bdcbbbf` (pr/b untouched).
 
-- [ ] **Step 4: List conflicted commits bottom-up**
+- [x] **Step 4: List conflicted commits bottom-up**
 
 Run:
 ```bash
@@ -148,7 +152,7 @@ Per-file guidance:
 | `crates/alexandria/src/config.rs`, `main.rs` | additive; `main`'s reminders config and the stack's embedding keys coexist. |
 | `docs/configuration.md`, `docs/roadmap.md`, `docs/session-memory.md` | keep both sides' sections; prefer `main`'s ordering. |
 
-- [ ] **Step 1: Take the oldest conflicted change and edit it**
+- [x] **Step 1: Take the oldest conflicted change and edit it**
 
 Run (replace `CHANGE` with the first change id in the file):
 ```bash
@@ -157,7 +161,7 @@ jj resolve --list
 ```
 Expected: the list of conflicted paths for this commit. `jj st` shows `Working copy` at that change with conflict markers on disk.
 
-- [ ] **Step 2: Resolve each listed file**
+- [x] **Step 2: Resolve each listed file**
 
 For `Cargo.lock`:
 ```bash
@@ -179,7 +183,7 @@ stack's line
 ```
 Apply the `%%%%%%%` diff onto the `+++++++` contents by hand, following the per-file table, and delete the markers. For `.rs` files run `cargo fmt --all` after editing.
 
-- [ ] **Step 3: Confirm this change is resolved and see what auto-resolved above it**
+- [x] **Step 3: Confirm this change is resolved and see what auto-resolved above it**
 
 Run:
 ```bash
@@ -188,7 +192,7 @@ jj log -r 'conflicts() & zozrllxzknvv..' --reversed --no-graph -T 'change_id.sho
 ```
 Expected: the first command reports no conflicts for this revision (jj prints an error like `No conflicts found at this revision`, which is the success signal here); the second list is shorter than before. Descendants that only conflicted because of this file are gone from it.
 
-- [ ] **Step 4: Repeat Steps 1–3 for the next oldest change until the list is empty**
+- [x] **Step 4: Repeat Steps 1–3 for the next oldest change until the list is empty**
 
 Fallback from the spec (Mechanics step 3): if one layer has five or more conflicted commits that all touch the same file, squash that layer to one commit before resolving, so the file is resolved once: `jj squash --from '<layer root>::<layer tip> ~ <layer tip>' --into <layer tip> -m "<the tip's description>"` (uses `-m`; the layer's bookmark stays on the tip). Do not do this to `pr/s3` (#11) or `pr/s6` (#14), which the reviewer accepted as shaped.
 
@@ -199,22 +203,22 @@ jj log -r '(2da0cbe..pr/s8-access-dedup) & ::@' --no-graph | wc -l
 ```
 Expected: `0` and `0`.
 
-- [ ] **Step 5: Drop any commit the rebase emptied**
+- [x] **Step 5: Drop any commit the rebase emptied**
 
 A stack commit can become empty when `main` already contains its change (candidates: the `pr/s1` tip "bump rmcp 3.2 -> 3.3 and smallvec" after `main`'s `cargo update`; AGENTS.md-only doc commits whose fact `main` now states). Run:
 ```bash
 jj log -r 'empty() & zozrllxzknvv.. & ~merges()' --no-graph -T 'change_id.short() ++ " " ++ bookmarks ++ " " ++ description.first_line() ++ "\n"'
 ```
-For each listed change: `jj abandon CHANGE`. jj reparents its children and moves any bookmark on it to the parent. Re-run the query; expected empty. Record which commits were abandoned in `/tmp/pr-rebase/abandoned.txt` (one line each: old description) — the #9 comment in Task 6 lists them.
+For each listed change: `jj abandon --retain-bookmarks CHANGE`. jj reparents its children and moves any bookmark on it to the parent. `--retain-bookmarks` is required: plain `jj abandon` in jj 0.45 **deletes** a bookmark sitting on the abandoned commit rather than moving it. Re-run the query; expected empty. Record which commits were abandoned in `/tmp/pr-rebase/abandoned.txt` (one line each: old description) — the #9 comment in Task 6 lists them.
 
-- [ ] **Step 6: Return to the wip working copy**
+- [x] **Step 6: Return to the wip working copy**
 
 Run:
 ```bash
-jj edit vxynnnyt
+jj edit lwyupnqn
 jj log -r '@' --no-graph -T 'description.first_line() ++ "\n"'
 ```
-Expected: `wip`. (`vxynnnyt` is the empty wip created when the spec amendment was committed; if `jj log -r 'description(exact:"wip") & @::'` shows a different id, use that one.)
+Expected: `wip`. (`lwyupnqn` is the empty wip on top of the plan commit `vxynnnyt`; if `jj log -r 'description(exact:"wip\n") & @::'` shows a different id, use that one. The revset needs the trailing newline — jj stores descriptions newline-terminated, so `description(exact:"wip")` matches nothing.)
 
 ---
 
@@ -227,7 +231,7 @@ Expected: `wip`. (`vxynnnyt` is the empty wip created when the spec amendment wa
 **Interfaces:**
 - Produces: `/tmp/pr-rebase/ci-summary.txt` with one `PASS`/`FAIL` line per bookmark; Task 6's push is gated on ten `PASS` lines.
 
-- [ ] **Step 1: Create the scratch workspace and share the target directory**
+- [x] **Step 1: Create the scratch workspace and share the target directory**
 
 Run:
 ```bash
@@ -240,7 +244,7 @@ jj workspace list
 ```
 Expected: two workspaces, `default` and `alexandria-ci`.
 
-- [ ] **Step 2: Install the pi companion's dev dependencies once**
+- [x] **Step 2: Install the pi companion's dev dependencies once**
 
 `just ci` on every rebased tip now includes `ext-test` (inherited from `main`'s justfile), which needs `node_modules`. Run at the first tip:
 ```bash
@@ -249,7 +253,7 @@ just ext-install 2>&1 | tail -3
 ```
 Expected: `npm ci` completes; `contrib/pi/extensions/alexandria/node_modules/` exists (gitignored, so `jj st` shows nothing).
 
-- [ ] **Step 3: Run `just ci` at each tip in stack order**
+- [x] **Step 3: Run `just ci` at each tip in stack order**
 
 Each iteration starts a fresh scratch child of the tip with `jj new` and leaves it in place; the scratch commits are abandoned together in Step 5. Never `jj abandon @` inside the loop: that would move the workspace onto the PR tip itself, and any stray file would then be snapshotted into the PR.
 
@@ -260,17 +264,17 @@ for b in pr/s1-deps-tooling pr/s2-embedding-config pr/s3-sessions pr/s4-hnsw pr/
   jj new "$b" -m "scratch: ci $b" >/dev/null 2>&1
   if just ci > "/tmp/pr-rebase/ci-$(basename "$b").log" 2>&1; then r=PASS; else r=FAIL; fi
   printf "%-28s %s\n" "$b" "$r" | tee -a /tmp/pr-rebase/ci-summary.txt
-  jj diff --stat | grep -q . && echo "WARNING: $b left tracked changes: $(jj diff --stat | tail -1)"
+  jj diff --summary | grep -q . && echo "WARNING: $b left tracked changes: $(jj diff --stat | tail -1)"
 done
 cat /tmp/pr-rebase/ci-summary.txt
 ```
 Expected: ten `PASS` lines and no `WARNING`. Each run is fmt + clippy + Rust tests + ext-test + cargo-deny + verify-assets; the first takes several minutes (cold clippy on the shared target dir), later ones less. The huggingface cache is warm (`~/.cache/huggingface/hub/models--sentence-transformers--all-MiniLM-L6-v2` exists) so the #9 download race cannot fire here; it is Phase 1's job.
 
-- [ ] **Step 4: On any FAIL, fix it in the layer commit and re-run from there**
+- [x] **Step 4: On any FAIL, fix it in the layer commit and re-run from there**
 
 Read `/tmp/pr-rebase/ci-<bookmark>.log`. If the failure is a conflict-resolution mistake (a duplicated function, a missing import, a doc test referencing a renamed recipe), fix it in the **default** workspace by `jj edit`-ing the commit that introduced the resolution (find it with `jj log -r 'zozrllxzknvv..<bookmark>' -p -- <file>`), then in the ci workspace re-run Step 3's loop body for that bookmark and every bookmark above it. If the failure pre-dates the rebase (reproduce at the old commit id from `/tmp/pr-rebase/tips-before.txt` with `jj new <old-id>` in the ci workspace), record it in `/tmp/pr-rebase/ci-summary.txt` as `FAIL (pre-existing: <one line>)` and continue; it is not this phase's job.
 
-- [ ] **Step 5: Abandon the scratch commits and remove the workspace**
+- [x] **Step 5: Abandon the scratch commits and remove the workspace**
 
 Run (still in the ci workspace; move `@` onto `main` first so no scratch commit is the working copy when abandoned):
 ```bash
@@ -283,7 +287,7 @@ jj workspace list
 jj log -r 'description(glob:"scratch: ci *")' --no-graph | wc -l
 for b in pr/s1-deps-tooling pr/s8-access-dedup pr/a-claude-hooks pr/c-docs; do jj log -r "$b" --no-graph -T 'bookmarks ++ " " ++ commit_id.short() ++ "\n"'; done
 ```
-Expected: `Abandoned 10 commits`; only `default` workspace; `0` scratch commits; the four bookmark commit ids are unchanged from before Task 4 (compare against `jj op log` if in doubt).
+Expected: `Abandoned 11 commits`, not 10 — Step 2 and the loop's first iteration each create one; only `default` workspace; `0` scratch commits; the four bookmark commit ids are unchanged from before Task 4 (compare against `jj op log` if in doubt).
 
 ---
 
@@ -298,7 +302,7 @@ Expected: `Abandoned 10 commits`; only `default` workspace; `0` scratch commits;
 
 The check: build the octopus merge of `pr/s8 + pr/a + pr/c` before the rebase (from the recorded old commit ids) and after. Every file that differs between the two must be a file upstream changed in `2da0cbe..e251a5e`. A file that differs but upstream never touched means a conflict resolution altered fork-only content.
 
-- [ ] **Step 1: Build both octopus merges in a throwaway git worktree**
+- [x] **Step 1: Build both octopus merges in a throwaway git worktree**
 
 Run:
 ```bash
@@ -317,7 +321,7 @@ echo "PRE=$PRE POST=$POST"
 ```
 Expected: both merges complete without `CONFLICT` (the #19 review measured zero textual conflicts between `pr/c` and every stack ref; `pr/a` is `contrib/claude` only). If the **post** merge conflicts, two PRs now resolve `main`'s changes differently; resolve it consistently in the offending layer commit (Task 3 procedure) and redo this step.
 
-- [ ] **Step 2: Diff the file sets**
+- [x] **Step 2: Diff the file sets**
 
 Run:
 ```bash
@@ -329,17 +333,17 @@ wc -l /tmp/pr-rebase/unexpected.txt; cat /tmp/pr-rebase/unexpected.txt
 ```
 Expected: `0` unexpected files. `Cargo.lock` is upstream-touched (`7487c1c`), so it is allowed to differ.
 
-- [ ] **Step 3: Eyeball the upstream-touched files that differ**
+- [x] **Step 3: Eyeball the upstream-touched files that differ**
 
 For each file in `octopus-check.txt` marked `upstream-touched`, the diff between the two octopi must be explainable as "upstream's change to this file" plus nothing else:
 ```bash
 for f in $(comm -12 /tmp/pr-rebase/changed-by-rebase.txt /tmp/pr-rebase/changed-by-upstream.txt); do
-  echo "=== $f: rebase-delta $(git diff --numstat "$PRE" "$POST" -- "$f" | cut -f1,2 | tr '\t' '/')  upstream-delta $(git diff --numstat 2da0cbe e251a5e -- "$f" | cut -f1,2 | tr '\t' '/')"
+  echo "=== $f: rebase-delta $(git diff --numstat --no-renames "$PRE" "$POST" -- "$f" | cut -f1,2 | tr '\t' '/')  upstream-delta $(git diff --numstat --no-renames 2da0cbe e251a5e -- "$f" | cut -f1,2 | tr '\t' '/')"
 done
 ```
 A file whose rebase-delta is much larger than its upstream-delta lost or duplicated fork content; open `git diff "$PRE" "$POST" -- <file>` and compare against `git diff 2da0cbe e251a5e -- <file>`. Fix in the layer commit and redo Task 5 from Step 1 (the post octopus must be rebuilt). If any `UNEXPECTED` file survives with a justified reason (e.g. `cargo fmt` reflowed a stack-only file), write the reason next to it in `octopus-check.txt`; it goes into the #9 comment.
 
-- [ ] **Step 4: Remove the worktree**
+- [x] **Step 4: Remove the worktree**
 
 Run:
 ```bash
@@ -359,18 +363,18 @@ Expected: only the main worktree.
 **Interfaces:**
 - Consumes: `/tmp/pr-rebase/ci-summary.txt` (ten `PASS`), `/tmp/pr-rebase/octopus-check.txt`, `/tmp/pr-rebase/abandoned.txt`.
 
-- [ ] **Step 1: Gate**
+- [x] **Step 1: Gate**
 
 Run:
 ```bash
 grep -c '^pr/.* PASS$' /tmp/pr-rebase/ci-summary.txt
 wc -l < /tmp/pr-rebase/unexpected.txt
 jj log -r 'conflicts()' --no-graph | wc -l
-jj log -r 'zozrllxzknvv..(pr/s8-access-dedup | pr/a-claude-hooks | pr/c-docs) & description(exact:"wip")' --no-graph | wc -l
+jj log -r 'zozrllxzknvv..(pr/s8-access-dedup | pr/a-claude-hooks | pr/c-docs) & description(exact:"wip\n")' --no-graph | wc -l
 ```
 Expected: `10`, `0` (or every remaining line annotated in `octopus-check.txt`), `0`, `0`. Do not push on any other result.
 
-- [ ] **Step 2: Push**
+- [x] **Step 2: Push**
 
 Run:
 ```bash
@@ -381,7 +385,7 @@ jj git push --remote origin \
 ```
 Expected: ten `Move forward bookmark`/`Move sideways bookmark` lines (sideways is normal after a rebase) and no `Refusing`. If jj refuses because a remote bookmark is "conflicted" or "untracked", run `jj bookmark track <name>@origin` for it and retry; do not use `--allow-new` unless the bookmark is genuinely missing on origin.
 
-- [ ] **Step 3: Confirm GitHub sees the new heads**
+- [x] **Step 3: Confirm GitHub sees the new heads**
 
 Run:
 ```bash
@@ -392,7 +396,7 @@ jj log -r 'pr/s1-deps-tooling | pr/a-claude-hooks | pr/c-docs' --no-graph -T 'bo
 ```
 Expected: each PR's `headRefOid` equals the local bookmark commit; `mergeable` is `MERGEABLE` or `UNKNOWN` (GitHub recomputes lazily), never `CONFLICTING`; base is `main`.
 
-- [ ] **Step 4: Write and post the #9 comment**
+- [x] **Step 4: Write and post the #9 comment**
 
 Write `/tmp/pr-rebase/comment-9.md` from this template, filling the three bracketed lists from the scratch files:
 ```markdown
@@ -418,7 +422,7 @@ gh pr comment 9 -R cebarks/alexandria --body-file /tmp/pr-rebase/comment-9.md
 ```
 Expected: a comment URL.
 
-- [ ] **Step 5: Write and post the #18 comment**
+- [x] **Step 5: Write and post the #18 comment**
 
 `/tmp/pr-rebase/comment-18.md`:
 ```markdown
@@ -429,7 +433,7 @@ gh pr comment 18 -R cebarks/alexandria --body-file /tmp/pr-rebase/comment-18.md
 ```
 Expected: a comment URL.
 
-- [ ] **Step 6: Record the outcome for later phases**
+- [x] **Step 6: Record the outcome for later phases**
 
 Store one memory in Alexandria (`mcp__alexandria__store_memory`) with content:
 `Alexandria upstream PR stack rebased onto cebarks/alexandria main e251a5e on <date>: pr/s1..s8, pr/a, pr/c pushed; pr/b (#18) deliberately left on 2da0cbe and parked as parked/pi-old-series because main relocated the pi extension to contrib/pi/extensions/alexandria/. Phase 0 of docs/superpowers/specs/2026-09-17-upstream-pr-stack-rebase-and-review-fixes-design.md is done; next is Phase 1 (#9 hub.rs race fix).`
