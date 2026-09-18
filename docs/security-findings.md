@@ -1,6 +1,6 @@
 # Security Findings
 
-Audit of 2026-09-10 against commit `858dd82`. Scope: the HTTP transport and debug UI (`src/main.rs`,
+Audit of 2026-09-10 against commit `858dd82`. Scope: the HTTP transport and debug UI (`crates/alexandria/src/main.rs`,
 `crates/alexandria-mcp`), the storage query layer, the embedding pipeline, and the two client
 integrations under `contrib/` (pi extension, Claude Code hooks). Method: full read of those files,
 cross-checked against the vendored `rmcp 3.2.0` source for transport defaults, plus live measurements
@@ -116,14 +116,14 @@ provenance and rendering rather than classification, and that is finding S2.
 
 **Where.**
 
-- `src/config.rs:47-48`: `allowed_origins` and `allowed_hosts` both default to `["*"]`.
-- `src/main.rs:142` and `:147`: a `"*"` entry calls `disable_allowed_hosts()` /
+- `crates/alexandria/src/config.rs:47-48`: `allowed_origins` and `allowed_hosts` both default to `["*"]`.
+- `crates/alexandria/src/main.rs:142` and `:147`: a `"*"` entry calls `disable_allowed_hosts()` /
   `disable_allowed_origins()` on the rmcp config.
 - rmcp `3.2.0`, `src/transport/streamable_http_server/tower.rs:172`: the library's own default is
   `allowed_hosts = ["localhost", "127.0.0.1", "::1"]`. `host_is_allowed` (`:762`) returns true only
   when the list is empty or matches, so Alexandria ships with a weaker default than the library it
   wraps.
-- The `/debug` router is merged alongside the rmcp service (`src/main.rs:304-306`) and is not
+- The `/debug` router is merged alongside the rmcp service (`crates/alexandria/src/main.rs:304-306`) and is not
   covered by rmcp's Host or Origin checks at all.
 
 **Attack.** The operator opens any web page while the server runs on loopback. The page's origin is
@@ -270,7 +270,7 @@ digest in config for the locked model. Not urgent.
 ## Recommended order
 
 1. S1: change the `allowed_hosts` default and add the env override. One config default and a few
-   lines in `src/main.rs`, plus a docs line.
+   lines in `crates/alexandria/src/main.rs`, plus a docs line.
 2. S2 steps 1 and 2: server-set `source`, returned and rendered. One migration, one field on
    `Fact`, two client renderers.
 3. S3 and S4: embed the two scripts, check `HX-Request`.

@@ -2,7 +2,7 @@
 
 Audit of 2026-09-10 against commit `858dd82`. Scope: the request path (`crates/alexandria-mcp/src/server.rs`),
 the storage repositories, the embedding provider (`crates/alexandria-pipeline`), the engine algorithms,
-and the background maintenance task in `src/main.rs`. "Performance" findings are about work done per
+and the background maintenance task in `crates/alexandria/src/main.rs`. "Performance" findings are about work done per
 request; "ability" findings are about retrieval quality and features the code claims but does not
 deliver.
 
@@ -284,7 +284,7 @@ edges (the early return at `:681` already does that after the first query).
 
 **Severity:** Low. **Effort:** none yet.
 
-**Where.** `src/main.rs:228-293`: after each executed merge the loop re-queries all clusters and
+**Where.** `crates/alexandria/src/main.rs:228-293`: after each executed merge the loop re-queries all clusters and
 re-counts members (through `get_members`, so with embeddings, see P2) before scanning for the next
 pair. Merges per tick times clusters times facts.
 
